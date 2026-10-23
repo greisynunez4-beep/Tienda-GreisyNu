@@ -342,4 +342,213 @@ elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
         venta_seleccionada_str = st.sidebar.selectbox(
             "Selecciona la venta a modificar", opciones_ventas
         )
-        idx_edit =
+        idx_edit = int(venta_seleccionada_str.split(":")[0])
+
+        reg_actual = st.session_state.ventas.loc[idx_edit]
+
+        nuevo_total = st.sidebar.number_input(
+            "Total Venta ($)",
+            min_value=0.0,
+            value=float(reg_actual["Total Venta ($)"]),
+            step=1000.0,
+        )
+        nuevo_abono = st.sidebar.number_input(
+            "Abono Actualizado ($)",
+            min_value=0.0,
+            value=float(reg_actual["Abono ($)"]),
+            step=1000.0,
+        )
+
+        nuevo_credito = max(0.0, nuevo_total - nuevo_abono)
+        st.sidebar.info(f"📉 Nuevo Crédito Pendiente: ${nuevo_credito:,.2f}")
+
+        if nuevo_credito == 0:
+            nuevo_estado = "Pagado Completo 🟢"
+        elif nuevo_abono > 0:
+            nuevo_estado = "Abono / Parcial 🟡"
+        else:
+            nuevo_estado = "Crédito Pendiente 🔴"
+
+        st.sidebar.write(f"**Nuevo Estado:** {nuevo_estado}")
+
+        if st.sidebar.button("Actualizar Venta"):
+            st.session_state.ventas.loc[idx_edit, "Total Venta ($)"] = (
+                nuevo_total
+            )
+            st.session_state.ventas.loc[idx_edit, "Abono ($)"] = nuevo_abono
+            st.session_state.ventas.loc[idx_edit, "Crédito Pendiente ($)"] = (
+                nuevo_credito
+            )
+            st.session_state.ventas.loc[idx_edit, "Estado"] = nuevo_estado
+            guardar_datos(st.session_state.ventas, ARCH_VENTAS)
+            st.sidebar.success("¡Venta actualizada con éxito!")
+            st.rerun()
+
+else:  # Registrar Venta o Promoción
+    st.sidebar.subheader("🛍️ Venta o Mensaje a Clienta")
+    tipo_movimiento = st.sidebar.selectbox(
+        "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
+    )
+    fecha_venta = st.sidebar.date_input("Fecha")
+
+    if not st.session_state.clientas.empty:
+        lista_nombres = list(st.session_state.clientas["Cliente"].unique())
+        lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
+        cliente_seleccionada = st.sidebar.selectbox(
+            "Seleccionar Clienta Guardada", lista_nombres
+        )
+
+        if cliente_seleccionada != "-- Escribir nueva o seleccionar --":
+            cliente = cliente_seleccionada
+            telefono = str(
+                st.session_state.clientas.loc[
+                    st.session_state.clientas["Cliente"] == cliente, "Teléfono"
+                ].values[0]
+            )
+            st.sidebar.info(f"📱 Teléfono cargado: `{telefono}`")
+        else:
+            cliente = st.sidebar.text_input(
+                "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
+            )
+            telefono = st.sidebar.text_input(
+                "Teléfono", placeholder="573001234567"
+            )
+    else:
+        st.sidebar.warning(
+            "💡 No tienes clientas guardadas aún. Puedes agregarlas en la opción"
+            " 'Crear / Registrar Nueva Clienta'."
+        )
+        cliente = st.sidebar.text_input(
+            "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
+        )
+        telefono = st.sidebar.text_input("Teléfono", placeholder="573001234567")
+
+    if tipo_movimiento == "Venta / Aviso de Pago":
+        if st.session_state.inventario.empty:
+            st.sidebar.warning(
+                "⚠️ No tienes productos en el inventario. Agrega productos"
+                " primero en 'Control de Inventario'."
+            )
+            descripcion = st.sidebar.text_input(
+                "Detalle del Producto", placeholder="Ej. Bolso"
+            )
+            cantidad_vendida = st.sidebar.number_input(
+                "Cantidad", min_value=1, value=1
+            )
+            total_venta = st.sidebar.number_input(
+                "Total Venta ($)", min_value=0.0, value=50000.0, step=1000.0
+            )
+        else:
+            lista_prods = list(st.session_state.inventario["Producto"].unique())
+            producto_elegido = st.sidebar.selectbox(
+                "Seleccionar Producto del Inventario", lista_prods
+            )
+
+            fila_prod = st.session_state.inventario.loc[
+                st.session_state.inventario["Producto"] == producto_elegido
+            ].iloc[0]
+            stock_disp = int(fila_prod["Stock Actual"])
+            precio_sug = float(fila_prod["Precio Venta Sugerido ($)"])
+
+            st.sidebar.info(
+                f"📦 Stock Disponible: **{stock_disp}** | 💲 Precio Sugerido:"
+                f" **${precio_sug:,.2f}**"
+            )
+
+            descripcion = producto_elegido
+            cantidad_vendida = st.sidebar.number_input(
+                "Cantidad a Vender",
+                min_value=1,
+                max_value=max(1, stock_disp),
+                value=1,
+                step=1,
+            )
+            total_venta = st.sidebar.number_input(
+                "Total Venta ($)",
+                min_value=0.0,
+                value=float(precio_sug * cantidad_vendida),
+                step=1000.0,
+            )
+
+        abono = st.sidebar.number_input(
+            "Abono Realizado por la Clienta ($)",
+            min_value=0.0,
+            value=float(total_venta),
+            step=1000.0,
+        )
+
+        credito_pendiente = max(0.0, total_venta - abono)
+        st.sidebar.info(f"📉 Crédito Pendiente: ${credito_pendiente:,.2f}")
+
+        if credito_pendiente == 0:
+            estado = "Pagado Completo 🟢"
+        elif abono > 0:
+            estado = "Abono / Parcial 🟡"
+        else:
+            estado = "Crédito Pendiente 🔴"
+    else:
+        descripcion = st.sidebar.text_area(
+            "Texto de la Promoción",
+            value=(
+                "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
+                " accesorios disponibles. ¿Te gustaría ver el catálogo?"
+            ),
+        )
+        cantidad_vendida = 0
+        total_venta = 0.0
+        abono = 0.0
+        credito_pendiente = 0.0
+        estado = "Promoción 📢"
+
+    if st.sidebar.button("Guardar Venta y Descontar Stock"):
+        if not cliente or not telefono:
+            st.sidebar.error(
+                "⚠️ Por favor, asegúrate de ingresar el nombre y el teléfono."
+            )
+        else:
+            nueva_venta = pd.DataFrame(
+                [[
+                    str(fecha_venta),
+                    cliente,
+                    telefono,
+                    tipo_movimiento,
+                    descripcion,
+                    cantidad_vendida,
+                    total_venta,
+                    abono,
+                    credito_pendiente,
+                    estado,
+                ]],
+                columns=COLUMNAS_VENTAS,
+            )
+            st.session_state.ventas = pd.concat(
+                [st.session_state.ventas, nueva_venta], ignore_index=True
+            )
+            st.session_state.ventas = st.session_state.ventas.sort_values(
+                by="Fecha", ascending=False
+            )
+            guardar_datos(st.session_state.ventas, ARCH_VENTAS)
+
+            if tipo_movimiento == "Venta / Aviso de Pago" and cantidad_vendida > 0:
+                if (
+                    not st.session_state.inventario.empty
+                    and descripcion
+                    in st.session_state.inventario["Producto"].values
+                ):
+                    idx_p = st.session_state.inventario.index[
+                        st.session_state.inventario["Producto"] == descripcion
+                    ][0]
+                    st.session_state.inventario.loc[idx_p, "Stock Actual"] = max(
+                        0,
+                        st.session_state.inventario.loc[idx_p, "Stock Actual"]
+                        - cantidad_vendida,
+                    )
+                    guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
+
+            if (
+                st.session_state.clientas.empty
+                or cliente not in st.session_state.clientas["Cliente"].values
+            ):
+                nueva_cli = pd.DataFrame(
+                    [[cliente, telefono]],
+                    columns=st.session_state.clientas.columns,
