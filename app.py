@@ -9,10 +9,10 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("👜 GreisyNu Store: Control Financiero, Inventario y Clientas")
+st.title("👜 GreisyNu Store: Control Financiero, Inventario Sincronizado y Clientas")
 st.write(
-    "Registra ventas, controla tu inventario, edita abonos, elimina compras y"
-    " notifica a tus clientas por WhatsApp."
+    "Tus compras y ventas actualizan el inventario automáticamente. Edita"
+    " abonos, controla créditos y notifica por WhatsApp."
 )
 
 # Definir las columnas oficiales exactas
@@ -28,7 +28,12 @@ COLUMNAS_VENTAS = [
     "Estado",
 ]
 
-COLUMNAS_COMPRAS = ["Fecha", "Proveedor / Detalle", "Inversión Total ($)"]
+COLUMNAS_COMPRAS = [
+    "Fecha",
+    "Proveedor / Detalle",
+    "Cantidad",
+    "Inversión Total ($)",
+]
 
 COLUMNAS_INVENTARIO = [
     "Producto",
@@ -70,7 +75,7 @@ menu_opcion = st.sidebar.selectbox(
     "¿Qué deseas hacer?",
     [
         "Registrar Venta o Promoción",
-        "📦 Control de Inventario (Entradas/Salidas)",
+        "📦 Ajuste Manual de Inventario",
         "✏️ Editar Venta o Abonar Saldo",
         "Crear / Registrar Nueva Clienta",
         "Registrar Compra / Inversión Global",
@@ -108,11 +113,14 @@ if menu_opcion == "Crear / Registrar Nueva Clienta":
                 st.sidebar.success("¡Clienta guardada con éxito!")
 
 elif menu_opcion == "Registrar Compra / Inversión Global":
-    st.sidebar.subheader("📦 Inversión en Mercancía")
+    st.sidebar.subheader("📦 Inversión y Entrada a Inventario")
     fecha_compra = st.sidebar.date_input("Fecha de Compra")
     detalle_compra = st.sidebar.text_input(
-        "Proveedor o Detalle",
-        placeholder="Ej. Surtido de bolsos mayorista",
+        "Nombre del Producto o Detalle",
+        placeholder="Ej. Bolso Crossbody Negro",
+    )
+    cantidad_comprada = st.sidebar.number_input(
+        "Cantidad Comprada", min_value=1, value=5, step=1
     )
     total_inversion = st.sidebar.number_input(
         "Costo Total de la Compra ($)",
@@ -121,13 +129,14 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
         step=10000.0,
     )
 
-    if st.sidebar.button("Guardar Compra"):
+    if st.sidebar.button("Guardar Compra y Actualizar Stock"):
         if not detalle_compra:
-            st.sidebar.error("⚠️ Por favor, ingresa un detalle o proveedor.")
+            st.sidebar.error("⚠️ Por favor, ingresa el detalle del producto.")
         else:
+            # 1. Registrar en la tabla de compras
             nueva_compra = pd.DataFrame(
-                [[fecha_compra, detalle_compra, total_inversion]],
-                columns=st.session_state.compras.columns,
+                [[fecha_compra, detalle_compra, cantidad_comprada, total_inversion]],
+                columns=COLUMNAS_COMPRAS,
             )
             st.session_state.compras = pd.concat(
                 [st.session_state.compras, nueva_compra], ignore_index=True
@@ -135,112 +144,64 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
             st.session_state.compras = st.session_state.compras.sort_values(
                 by="Fecha", ascending=False
             )
-            st.sidebar.success("¡Inversión guardada con éxito!")
 
-elif menu_opcion == "📦 Control de Inventario (Entradas/Salidas)":
-    st.sidebar.subheader("📦 Gestión de Stock")
-    tipo_inv = st.sidebar.radio(
-        "Operación",
-        [
-            "Nuevo Producto / Registrar Entrada",
-            "Registrar Salida / Venta de Stock",
-        ],
-    )
-
-    if tipo_inv == "Nuevo Producto / Registrar Entrada":
-        prod_nombre = st.sidebar.text_input(
-            "Nombre del Producto", placeholder="Ej. Bolso Crossbody Negro"
-        )
-        prod_cat = st.sidebar.selectbox(
-            "Categoría", ["Bolsos 👜", "Zapatos 👠", "Accesorios ✨", "Otros"]
-        )
-        cantidad_inc = st.sidebar.number_input(
-            "Cantidad que ingresa", min_value=1, value=5, step=1
-        )
-        precio_sug = st.sidebar.number_input(
-            "Precio de Venta Sugerido ($)",
-            min_value=0.0,
-            value=60000.0,
-            step=1000.0,
-        )
-
-        if st.sidebar.button("Guardar Entrada en Inventario"):
-            if not prod_nombre:
-                st.sidebar.error("⚠️ Ingresa el nombre del producto.")
-            else:
-                if (
-                    not st.session_state.inventario.empty
-                    and prod_nombre
-                    in st.session_state.inventario["Producto"].values
-                ):
-                    idx_p = st.session_state.inventario.index[
-                        st.session_state.inventario["Producto"] == prod_nombre
-                    ][0]
-                    st.session_state.inventario.loc[idx_p, "Stock Actual"] += (
-                        cantidad_inc
-                    )
-                    st.session_state.inventario.loc[
-                        idx_p, "Precio Venta Sugerido ($)"
-                    ] = precio_sug
-                    st.sidebar.success(
-                        f"¡Stock actualizado! Se sumaron {cantidad_inc} unidades"
-                        f" a `{prod_nombre}`."
-                    )
-                else:
-                    nuevo_prod = pd.DataFrame(
-                        [[prod_nombre, prod_cat, cantidad_inc, precio_sug]],
-                        columns=COLUMNAS_INVENTARIO,
-                    )
-                    st.session_state.inventario = pd.concat(
-                        [st.session_state.inventario, nuevo_prod],
-                        ignore_index=True,
-                    )
-                    st.sidebar.success(
-                        f"¡Nuevo producto `{prod_nombre}` registrado con"
-                        f" éxito!"
-                    )
-
-    else:
-        if st.session_state.inventario.empty:
-            st.sidebar.warning(
-                "No hay productos en el inventario para descontar."
-            )
-        else:
-            prod_lista = list(st.session_state.inventario["Producto"].unique())
-            prod_salida = st.sidebar.selectbox(
-                "Seleccionar Producto", prod_lista
-            )
-            stock_actual = int(
-                st.session_state.inventario.loc[
-                    st.session_state.inventario["Producto"] == prod_salida,
-                    "Stock Actual",
-                ].values[0]
-            )
-            st.sidebar.info(f"📦 Stock disponible actual: `{stock_actual}`")
-
-            cant_salida = st.sidebar.number_input(
-                "Cantidad a retirar / vender",
-                min_value=1,
-                max_value=max(1, stock_actual),
-                value=1,
-                step=1,
-            )
-
-            if st.sidebar.button("Registrar Salida de Stock"):
+            # 2. Actualizar Inventario Automáticamente (Suma stock)
+            if (
+                not st.session_state.inventario.empty
+                and detalle_compra
+                in st.session_state.inventario["Producto"].values
+            ):
                 idx_p = st.session_state.inventario.index[
-                    st.session_state.inventario["Producto"] == prod_salida
+                    st.session_state.inventario["Producto"] == detalle_compra
                 ][0]
-                if cant_salida > stock_actual:
-                    st.sidebar.error("⚠️ No hay suficiente stock disponible.")
-                else:
-                    st.session_state.inventario.loc[
-                        idx_p, "Stock Actual"
-                    ] -= cant_salida
-                    st.sidebar.success(
-                        f"¡Salida registrada! Se descontaron {cant_salida}"
-                        f" unidades de `{prod_salida}`."
-                    )
-                    st.rerun()
+                st.session_state.inventario.loc[idx_p, "Stock Actual"] += (
+                    cantidad_comprada
+                )
+            else:
+                precio_sug_def = (
+                    total_inversion / cantidad_comprada
+                ) * 1.5  # Sugiere 50% margen
+                nuevo_prod = pd.DataFrame(
+                    [[detalle_compra, "General", cantidad_comprada, precio_sug_def]],
+                    columns=COLUMNAS_INVENTARIO,
+                )
+                st.session_state.inventario = pd.concat(
+                    [st.session_state.inventario, nuevo_prod], ignore_index=True
+                )
+
+            st.sidebar.success(
+                "¡Compra guardada y stock actualizado con éxito!"
+            )
+
+elif menu_opcion == "📦 Ajuste Manual de Inventario":
+    st.sidebar.subheader("📦 Ajustar Stock Manualmente")
+    if st.session_state.inventario.empty:
+        st.sidebar.warning("No hay productos en el inventario para ajustar.")
+    else:
+        prod_lista = list(st.session_state.inventario["Producto"].unique())
+        prod_sel = st.sidebar.selectbox("Seleccionar Producto", prod_lista)
+        stock_actual = int(
+            st.session_state.inventario.loc[
+                st.session_state.inventario["Producto"] == prod_sel,
+                "Stock Actual",
+            ].values[0]
+        )
+        st.sidebar.info(f"📦 Stock actual: `{stock_actual}`")
+
+        nuevo_stock = st.sidebar.number_input(
+            "Nuevo Stock Total",
+            min_value=0,
+            value=stock_actual,
+            step=1,
+        )
+
+        if st.sidebar.button("Actualizar Stock Manual"):
+            idx_p = st.session_state.inventario.index[
+                st.session_state.inventario["Producto"] == prod_sel
+            ][0]
+            st.session_state.inventario.loc[idx_p, "Stock Actual"] = nuevo_stock
+            st.sidebar.success("¡Inventario ajustado correctamente!")
+            st.rerun()
 
 elif menu_opcion == "🗑️ Eliminar Compra Equivocada":
     st.sidebar.subheader("🗑️ Eliminar Compra")
@@ -250,7 +211,7 @@ elif menu_opcion == "🗑️ Eliminar Compra Equivocada":
         opciones_compras = []
         for idx, row in st.session_state.compras.iterrows():
             opciones_compras.append(
-                f"{idx}: [{row['Fecha']}] {row['Proveedor / Detalle']} (${row['Inversión Total ($)']})"
+                f"{idx}: [{row['Fecha']}] {row['Proveedor / Detalle']} (Cant: {row['Cantidad']}) - ${row['Inversión Total ($)']}"
             )
 
         compra_a_borrar_str = st.sidebar.selectbox(
@@ -259,10 +220,32 @@ elif menu_opcion == "🗑️ Eliminar Compra Equivocada":
         idx_borrar = int(compra_a_borrar_str.split(":")[0])
 
         if st.sidebar.button("Eliminar Compra Seleccionada"):
+            # Opcional: Descontar del inventario lo que se había sumado
+            prod_afectado = st.session_state.compras.loc[
+                idx_borrar, "Proveedor / Detalle"
+            ]
+            cant_afectada = int(
+                st.session_state.compras.loc[idx_borrar, "Cantidad"]
+            )
+
+            if (
+                not st.session_state.inventario.empty
+                and prod_afectado
+                in st.session_state.inventario["Producto"].values
+            ):
+                idx_p = st.session_state.inventario.index[
+                    st.session_state.inventario["Producto"] == prod_afectado
+                ][0]
+                st.session_state.inventario.loc[idx_p, "Stock Actual"] = max(
+                    0,
+                    st.session_state.inventario.loc[idx_p, "Stock Actual"]
+                    - cant_afectada,
+                )
+
             st.session_state.compras = st.session_state.compras.drop(
                 idx_borrar
             ).reset_index(drop=True)
-            st.sidebar.success("¡Compra eliminada con éxito!")
+            st.sidebar.success("¡Compra eliminada y stock descontado!")
             st.rerun()
 
 elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
@@ -297,143 +280,4 @@ elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
         )
 
         nuevo_credito = max(0.0, nuevo_total - nuevo_abono)
-        st.sidebar.info(f"📉 Nuevo Crédito Pendiente: ${nuevo_credito:,.2f}")
-
-        if nuevo_credito == 0:
-            nuevo_estado = "Pagado Completo 🟢"
-        elif nuevo_abono > 0:
-            nuevo_estado = "Abono / Parcial 🟡"
-        else:
-            nuevo_estado = "Crédito Pendiente 🔴"
-
-        st.sidebar.write(f"**Nuevo Estado:** {nuevo_estado}")
-
-        if st.sidebar.button("Actualizar Venta"):
-            st.session_state.ventas.loc[idx_edit, "Total Venta ($)"] = (
-                nuevo_total
-            )
-            st.session_state.ventas.loc[idx_edit, "Abono ($)"] = nuevo_abono
-            st.session_state.ventas.loc[idx_edit, "Crédito Pendiente ($)"] = (
-                nuevo_credito
-            )
-            st.session_state.ventas.loc[idx_edit, "Estado"] = nuevo_estado
-            st.sidebar.success("¡Venta actualizada con éxito!")
-            st.rerun()
-
-else:  # Registrar Venta o Promoción
-    st.sidebar.subheader("🛍️ Venta o Mensaje a Clienta")
-    tipo_movimiento = st.sidebar.selectbox(
-        "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
-    )
-    fecha_venta = st.sidebar.date_input("Fecha")
-
-    if not st.session_state.clientas.empty:
-        lista_nombres = list(st.session_state.clientas["Cliente"].unique())
-        lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
-        cliente_seleccionada = st.sidebar.selectbox(
-            "Seleccionar Clienta Guardada", lista_nombres
-        )
-
-        if cliente_seleccionada != "-- Escribir nueva o seleccionar --":
-            cliente = cliente_seleccionada
-            telefono = str(
-                st.session_state.clientas.loc[
-                    st.session_state.clientas["Cliente"] == cliente, "Teléfono"
-                ].values[0]
-            )
-            st.sidebar.info(f"📱 Teléfono cargado: `{telefono}`")
-        else:
-            cliente = st.sidebar.text_input(
-                "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
-            )
-            telefono = st.sidebar.text_input(
-                "Teléfono", placeholder="573001234567"
-            )
-    else:
-        st.sidebar.warning(
-            "💡 No tienes clientas guardadas aún. Puedes agregarlas en la opción"
-            " 'Crear / Registrar Nueva Clienta'."
-        )
-        cliente = st.sidebar.text_input(
-            "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
-        )
-        telefono = st.sidebar.text_input("Teléfono", placeholder="573001234567")
-
-    if tipo_movimiento == "Venta / Aviso de Pago":
-        descripcion = st.sidebar.text_input(
-            "Detalle del Producto", placeholder="Ej. Bolso Crossbody Negro"
-        )
-        total_venta = st.sidebar.number_input(
-            "Total Venta ($)", min_value=0.0, value=50000.0, step=1000.0
-        )
-        abono = st.sidebar.number_input(
-            "Abono Realizado ($)", min_value=0.0, value=50000.0, step=1000.0
-        )
-
-        credito_pendiente = max(0.0, total_venta - abono)
-        st.sidebar.info(f"📉 Crédito Pendiente: ${credito_pendiente:,.2f}")
-
-        if credito_pendiente == 0:
-            estado = "Pagado Completo 🟢"
-        elif abono > 0:
-            estado = "Abono / Parcial 🟡"
-        else:
-            estado = "Crédito Pendiente 🔴"
-    else:
-        descripcion = st.sidebar.text_area(
-            "Texto de la Promoción",
-            value=(
-                "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
-                " accesorios disponibles. ¿Te gustaría ver el catálogo?"
-            ),
-        )
-        total_venta = 0.0
-        abono = 0.0
-        credito_pendiente = 0.0
-        estado = "Promoción 📢"
-
-    if st.sidebar.button("Guardar Venta y Generar WhatsApp"):
-        if not cliente or not telefono:
-            st.sidebar.error(
-                "⚠️ Por favor, asegúrate de ingresar el nombre y el teléfono."
-            )
-        else:
-            nueva_venta = pd.DataFrame(
-                [[
-                    fecha_venta,
-                    cliente,
-                    telefono,
-                    tipo_movimiento,
-                    descripcion,
-                    total_venta,
-                    abono,
-                    credito_pendiente,
-                    estado,
-                ]],
-                columns=COLUMNAS_VENTAS,
-            )
-            st.session_state.ventas = pd.concat(
-                [st.session_state.ventas, nueva_venta], ignore_index=True
-            )
-            st.session_state.ventas = st.session_state.ventas.sort_values(
-                by="Fecha", ascending=False
-            )
-
-            if (
-                st.session_state.clientas.empty
-                or cliente not in st.session_state.clientas["Cliente"].values
-            ):
-                nueva_cli = pd.DataFrame(
-                    [[cliente, telefono]],
-                    columns=st.session_state.clientas.columns,
-                )
-                st.session_state.clientas = pd.concat(
-                    [st.session_state.clientas, nueva_cli], ignore_index=True
-                )
-
-            st.sidebar.success("¡Venta registrada con éxito!")
-
-# --- PANEL PRINCIPAL: RESUMEN Y PESTAÑAS ---
-df_compras = st.session_state.compras
-df_ventas = st.session_state.ventas
-df_clientas = st
+        st.sidebar.info
