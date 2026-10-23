@@ -1,4 +1,4 @@
-   import urllib.parse
+import urllib.parse
 import pandas as pd
 import streamlit as st
 
@@ -33,9 +33,8 @@ if "data" not in st.session_state:
 st.sidebar.header("📝 Registrar Venta o Pago")
 
 cliente = st.sidebar.text_input("Nombre de la Clienta", placeholder="Ej. Ana Gómez")
-# Recomendación: Indicar el prefijo de país para que el enlace de WhatsApp funcione bien
 telefono = st.sidebar.text_input(
-    "Teléfono (Ej: 573001234567)", placeholder="573001234567"
+    "Teléfono (con código de país)", placeholder="573001234567"
 )
 tipo_movimiento = st.sidebar.selectbox(
     "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
@@ -88,13 +87,10 @@ if not df.empty:
         " botón verde para redactar el mensaje en WhatsApp."
     )
 
-    # Mostrar filas de forma clara y limpia
     for index, row in df.iterrows():
-        # Contenedor visual para cada registro
         with st.container():
             col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
 
-            # Mostrar nombre y número de forma muy visible
             col1.markdown(f"**👤 {row['Cliente']}**")
             col1.caption(f"📱 Tel: `{row['Teléfono']}`")
 
@@ -105,7 +101,7 @@ if not df.empty:
                 unsafe_allow_html=True,
             )
 
-            # Construir mensaje personalizado
+            # Construir mensaje personalizado con el nombre, producto y valor
             if "Pago Recibido" in str(row["Estado"]):
                 texto_msj = (
                     f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store para"
@@ -122,7 +118,6 @@ if not df.empty:
                     f" por: *{row['Descripción']}*."
                 )
 
-            # Generar enlace seguro para WhatsApp
             mensaje_codificado = urllib.parse.quote(texto_msj)
             link_wsp = (
                 f"https://wa.me/{row['Teléfono']}?text={mensaje_codificado}"
