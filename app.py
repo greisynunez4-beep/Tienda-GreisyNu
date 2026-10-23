@@ -231,5 +231,98 @@ df_compras = st.session_state.compras
 df_ventas = st.session_state.ventas
 df_clientas = st.session_state.clientas
 
-# Calcular totales globales
-total_
+# Calcular totales globales de forma segura
+total_invertido_compras = (
+    df_compras["Inversión Total ($)"].sum() if not df_compras.empty else 0.0
+)
+
+if not df_ventas.empty:
+    df_solo_ventas = df_ventas[df_ventas["Tipo"] == "Venta / Aviso de Pago"]
+    total_ingresos_ventas = (
+        df_solo_ventas["Total Venta ($)"].sum()
+        if not df_solo_ventas.empty
+        else 0.0
+    )
+    total_abonos_recibidos = (
+        df_solo_ventas["Abono ($)"].sum() if not df_solo_ventas.empty else 0.0
+    )
+    total_creditos_pendientes = (
+        df_solo_ventas["Crédito Pendiente ($)"].sum()
+        if not df_solo_ventas.empty
+        else 0.0
+    )
+else:
+    total_ingresos_ventas = 0.0
+    total_abonos_recibidos = 0.0
+    total_creditos_pendientes = 0.0
+
+# Tarjetas de Resumen Financiero Global
+col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+col_m1.metric("📦 Inversión Compras", f"${total_invertido_compras:,.2f}")
+col_m2.metric("💰 Ventas Totales", f"${total_ingresos_ventas:,.2f}")
+col_m3.metric("📥 Abonos Recibidos", f"${total_abonos_recibidos:,.2f}")
+col_m4.metric("⚠️ Crédito Pendiente", f"${total_creditos_pendientes:,.2f}")
+
+st.markdown("---")
+
+# Pestañas principales
+tab1, tab2, tab3 = st.tabs([
+    "💬 Historial de Ventas y WhatsApp",
+    "👥 Directorio de Clientas",
+    "📦 Registro de Compras Detallado",
+])
+
+with tab1:
+    if not df_ventas.empty:
+        st.subheader("📋 Ventas, Abonos y Créditos Ordenados por Fecha")
+
+        for index, row in df_ventas.iterrows():
+            with st.container():
+                c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
+
+                c1.markdown(f"**📅 {row['Fecha']}**")
+                c1.markdown(f"**👤 {row['Cliente']}**")
+                c1.caption(f"📱 Tel: `{row['Teléfono']}`")
+
+                c2.markdown(f"**Estado:** {row['Estado']}")
+
+                if row["Tipo"] == "Venta / Aviso de Pago":
+                    c3.markdown(
+                        f"**Prod:** {row['Descripción']} <br> **Total:**"
+                        f" ${row['Total Venta ($)']:,.2f} <br> **Abono:**"
+                        f" ${row['Abono ($)']:,.2f} <br> **Pendiente:**"
+                        f" 🔴 ${row['Crédito Pendiente ($)']:,.2f}",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    c3.markdown(f"**Promoción:** {row['Descripción']}")
+
+                # Construir mensaje inteligente para WhatsApp según el estado
+                if "Pagado Completo" in str(row["Estado"]):
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para confirmarte que hemos recibido tu pago total por"
+                        f" ${row['Total Venta ($)']:,.2f} correspondiente a:"
+                        f" *{row['Descripción']}*. ¡Muchas gracias por tu"
+                        " compra!"
+                    )
+                elif "Abono" in str(row["Estado"]):
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para confirmarte tu abono de ${row['Abono ($)']:,.2f}."
+                        f" El total de tu compra es ${row['Total Venta ($)']:,.2f}"
+                        f" y te queda un saldo pendiente de"
+                        f" ${row['Crédito Pendiente ($)']:,.2f} por:"
+                        f" *{row['Descripción']}*. ¡Gracias!"
+                    )
+                elif "Promoción" in str(row["Estado"]):
+                    texto_msj = row["Descripción"]
+                else:
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para recordarte que tienes un saldo pendiente de"
+                        f" ${row['Crédito Pendiente ($)']:,.2f} por tu compra"
+                        f" de: *{row['Descripción']}*."
+                    )
+
+                mensaje_
