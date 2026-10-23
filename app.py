@@ -1,3 +1,4 @@
+import os
 import urllib.parse
 import pandas as pd
 import streamlit as st
@@ -11,11 +12,16 @@ st.set_page_config(
 
 st.title("👜 GreisyNu Store: Control Financiero, Inventario y Ventas Sincronizadas")
 st.write(
-    "Control absoluto de tu inventario, ventas con selección de stock, abonos,"
-    " créditos y reportes detallados."
+    "Tus datos ahora se guardan automáticamente para que no se pierda nada al"
+    " actualizar la página."
 )
 
-# Definir las columnas oficiales exactas
+# Definir archivos de persistencia local
+ARCH_VENTAS = "ventas.csv"
+ARCH_COMPRAS = "compras.csv"
+ARCH_CLIENTAS = "clientas.csv"
+ARCH_INVENTARIO = "inventario.csv"
+
 COLUMNAS_VENTAS = [
     "Fecha",
     "Cliente",
@@ -43,18 +49,35 @@ COLUMNAS_INVENTARIO = [
     "Precio Venta Sugerido ($)",
 ]
 
-# Inicializar bases de datos en la sesión para que no se pierda nada
-if "compras" not in st.session_state:
-    st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
 
+# Funciones para cargar y guardar datos sin que se borren
+def cargar_datos(archivo, columnas):
+    if os.path.exists(archivo):
+        try:
+            return pd.read_csv(archivo)
+        except Exception:
+            return pd.DataFrame(columns=columnas)
+    return pd.DataFrame(columns=columnas)
+
+
+def guardar_datos(df, archivo):
+    df.to_csv(archivo, index=False)
+
+
+# Cargar bases de datos desde los archivos CSV locales
 if "ventas" not in st.session_state:
-    st.session_state.ventas = pd.DataFrame(columns=COLUMNAS_VENTAS)
+    st.session_state.ventas = cargar_datos(ARCH_VENTAS, COLUMNAS_VENTAS)
+
+if "compras" not in st.session_state:
+    st.session_state.compras = cargar_datos(ARCH_COMPRAS, COLUMNAS_COMPRAS)
 
 if "clientas" not in st.session_state:
-    st.session_state.clientas = pd.DataFrame(columns=["Cliente", "Teléfono"])
+    st.session_state.clientas = cargar_datos(ARCH_CLIENTAS, ["Cliente", "Teléfono"])
 
 if "inventario" not in st.session_state:
-    st.session_state.inventario = pd.DataFrame(columns=COLUMNAS_INVENTARIO)
+    st.session_state.inventario = cargar_datos(
+        ARCH_INVENTARIO, COLUMNAS_INVENTARIO
+    )
 
 # --- MENÚ LATERAL: GESTIÓN Y REGISTROS ---
 st.sidebar.header("📝 Menú de Gestión")
@@ -98,6 +121,7 @@ if menu_opcion == "Crear / Registrar Nueva Clienta":
                 st.session_state.clientas = pd.concat(
                     [st.session_state.clientas, df_nueva], ignore_index=True
                 )
+                guardar_datos(st.session_state.clientas, ARCH_CLIENTAS)
                 st.sidebar.success("¡Clienta guardada con éxito!")
 
 elif menu_opcion == "Registrar Compra / Inversión Global":
@@ -122,7 +146,7 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
             st.sidebar.error("⚠️ Por favor, ingresa el detalle del producto.")
         else:
             nueva_compra = pd.DataFrame(
-                [[fecha_compra, detalle_compra, cantidad_comprada, total_inversion]],
+                [[str(fecha_compra), detalle_compra, cantidad_comprada, total_inversion]],
                 columns=COLUMNAS_COMPRAS,
             )
             st.session_state.compras = pd.concat(
@@ -131,8 +155,9 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
             st.session_state.compras = st.session_state.compras.sort_values(
                 by="Fecha", ascending=False
             )
+            guardar_datos(st.session_state.compras, ARCH_COMPRAS)
 
-            # Actualizar inventario automáticamente
+            # Actualizar inventario
             if (
                 not st.session_state.inventario.empty
                 and detalle_compra
@@ -145,9 +170,7 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
                     cantidad_comprada
                 )
             else:
-                precio_sug_def = (
-                    total_inversion / cantidad_comprada
-                ) * 1.5  # Margen sugerido del 50%
+                precio_sug_def = (total_inversion / cantidad_comprada) * 1.5
                 nuevo_prod = pd.DataFrame(
                     [[detalle_compra, "General", cantidad_comprada, precio_sug_def]],
                     columns=COLUMNAS_INVENTARIO,
@@ -156,6 +179,7 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
                     [st.session_state.inventario, nuevo_prod], ignore_index=True
                 )
 
+            guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
             st.sidebar.success(
                 "¡Compra guardada y stock actualizado con éxito!"
             )
@@ -205,10 +229,6 @@ elif menu_opcion == "📦 Control de Inventario (Entradas/Salidas)":
                     st.session_state.inventario.loc[
                         idx_p, "Precio Venta Sugerido ($)"
                     ] = precio_sug
-                    st.sidebar.success(
-                        f"¡Stock actualizado! Se sumaron {cantidad_inc} unidades"
-                        f" a `{prod_nombre}`."
-                    )
                 else:
                     nuevo_prod = pd.DataFrame(
                         [[prod_nombre, prod_cat, cantidad_inc, precio_sug]],
@@ -218,10 +238,11 @@ elif menu_opcion == "📦 Control de Inventario (Entradas/Salidas)":
                         [st.session_state.inventario, nuevo_prod],
                         ignore_index=True,
                     )
-                    st.sidebar.success(
-                        f"¡Nuevo producto `{prod_nombre}` registrado con"
-                        f" éxito!"
-                    )
+
+                guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
+                st.sidebar.success(
+                    f"¡Stock actualizado para `{prod_nombre}`!"
+                )
     else:
         if st.session_state.inventario.empty:
             st.sidebar.warning(
@@ -258,10 +279,8 @@ elif menu_opcion == "📦 Control de Inventario (Entradas/Salidas)":
                     st.session_state.inventario.loc[
                         idx_p, "Stock Actual"
                     ] -= cant_salida
-                    st.sidebar.success(
-                        f"¡Salida registrada! Se descontaron {cant_salida}"
-                        f" unidades de `{prod_salida}`."
-                    )
+                    guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
+                    st.sidebar.success("¡Salida registrada con éxito!")
                     st.rerun()
 
 elif menu_opcion == "🗑️ Eliminar Compra Equivocada":
@@ -301,10 +320,12 @@ elif menu_opcion == "🗑️ Eliminar Compra Equivocada":
                     st.session_state.inventario.loc[idx_p, "Stock Actual"]
                     - cant_afectada,
                 )
+                guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
 
             st.session_state.compras = st.session_state.compras.drop(
                 idx_borrar
             ).reset_index(drop=True)
+            guardar_datos(st.session_state.compras, ARCH_COMPRAS)
             st.sidebar.success("¡Compra eliminada y stock descontado!")
             st.rerun()
 
@@ -360,6 +381,7 @@ elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
                 nuevo_credito
             )
             st.session_state.ventas.loc[idx_edit, "Estado"] = nuevo_estado
+            guardar_datos(st.session_state.ventas, ARCH_VENTAS)
             st.sidebar.success("¡Venta actualizada con éxito!")
             st.rerun()
 
@@ -370,7 +392,6 @@ else:  # Registrar Venta o Promoción
     )
     fecha_venta = st.sidebar.date_input("Fecha")
 
-    # Selección de Clienta
     if not st.session_state.clientas.empty:
         lista_nombres = list(st.session_state.clientas["Cliente"].unique())
         lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
@@ -488,7 +509,7 @@ else:  # Registrar Venta o Promoción
         else:
             nueva_venta = pd.DataFrame(
                 [[
-                    fecha_venta,
+                    str(fecha_venta),
                     cliente,
                     telefono,
                     tipo_movimiento,
@@ -507,8 +528,9 @@ else:  # Registrar Venta o Promoción
             st.session_state.ventas = st.session_state.ventas.sort_values(
                 by="Fecha", ascending=False
             )
+            guardar_datos(st.session_state.ventas, ARCH_VENTAS)
 
-            # Descontar stock automáticamente del inventario
+            # Descontar stock
             if tipo_movimiento == "Venta / Aviso de Pago" and cantidad_vendida > 0:
                 if (
                     not st.session_state.inventario.empty
@@ -523,6 +545,7 @@ else:  # Registrar Venta o Promoción
                         st.session_state.inventario.loc[idx_p, "Stock Actual"]
                         - cantidad_vendida,
                     )
+                    guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
 
             if (
                 st.session_state.clientas.empty
@@ -535,8 +558,9 @@ else:  # Registrar Venta o Promoción
                 st.session_state.clientas = pd.concat(
                     [st.session_state.clientas, nueva_cli], ignore_index=True
                 )
+                guardar_datos(st.session_state.clientas, ARCH_CLIENTAS)
 
-            st.sidebar.success("¡Venta registrada y stock descontado con éxito!")
+            st.sidebar.success("¡Venta registrada y guardada con éxito!")
 
 # --- PANEL PRINCIPAL: RESUMEN Y PESTAÑAS ---
 df_compras = st.session_state.compras
@@ -580,7 +604,7 @@ col_m5.metric("📈 Utilidad Obtenida", f"${utilidad_obtenida:,.2f}")
 
 st.markdown("---")
 
-# Pestañas principales organizadas para mostrar TODO el detalle
+# Pestañas principales
 tab1, tab2, tab3, tab4 = st.tabs([
     "💬 Historial de Ventas y WhatsApp",
     "📦 Control de Inventario (Stock)",
@@ -653,6 +677,7 @@ with tab1:
 
         if st.button("🗑️ Borrar Historial de Ventas"):
             st.session_state.ventas = pd.DataFrame(columns=COLUMNAS_VENTAS)
+            guardar_datos(st.session_state.ventas, ARCH_VENTAS)
             st.rerun()
     else:
         st.info("Aún no hay registros de ventas o mensajes.")
@@ -670,6 +695,7 @@ with tab2:
             st.session_state.inventario = pd.DataFrame(
                 columns=COLUMNAS_INVENTARIO
             )
+            guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
             st.rerun()
     else:
         st.info(
@@ -685,6 +711,7 @@ with tab3:
 
         if st.button("🗑️ Borrar Directorio de Clientas"):
             st.session_state.clientas = pd.DataFrame(columns=["Cliente", "Teléfono"])
+            guardar_datos(st.session_state.clientas, ARCH_CLIENTAS)
             st.rerun()
     else:
         st.info(
@@ -700,6 +727,7 @@ with tab4:
 
         if st.button("🗑️ Borrar Historial de Compras"):
             st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
+            guardar_datos(st.session_state.compras, ARCH_COMPRAS)
             st.rerun()
     else:
         st.info(
