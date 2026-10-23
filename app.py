@@ -12,8 +12,8 @@ st.set_page_config(
 
 st.title("👜 GreisyNu Store: Control Financiero, Inventario y Utilidad Real")
 st.write(
-    "Control absoluto de inventario, ventas, abonos, cuentas por cobrar y"
-    " utilidad detallada por cada compra y producto."
+    "Control absoluto de inventario, ventas, abonos, cuentas por cobrar,"
+    " directorio de clientas y utilidad por producto."
 )
 
 # Definir archivos de persistencia local
@@ -98,6 +98,7 @@ menu_opcion = st.sidebar.selectbox(
         "📦 Control de Inventario (Entradas/Salidas)",
         "✏️ Editar Venta o Abonar Saldo",
         "Crear / Registrar Nueva Clienta",
+        "✏️ Editar o Actualizar Clienta",
         "Registrar Compra / Inversión Global",
         "🗑️ Eliminar Compra Equivocada",
     ],
@@ -132,6 +133,44 @@ if menu_opcion == "Crear / Registrar Nueva Clienta":
                 )
                 guardar_datos(st.session_state.clientas, ARCH_CLIENTAS)
                 st.sidebar.success("¡Clienta guardada con éxito!")
+
+elif menu_opcion == "✏️ Editar o Actualizar Clienta":
+    st.sidebar.subheader("✏️ Modificar Datos de Clienta")
+    if st.session_state.clientas.empty:
+        st.sidebar.warning("No hay clientas registradas para editar.")
+    else:
+        lista_clientas_edit = list(st.session_state.clientas["Cliente"].unique())
+        clienta_elegida = st.sidebar.selectbox(
+            "Seleccionar Clienta a Modificar", lista_clientas_edit
+        )
+
+        idx_cli = st.session_state.clientas.index[
+            st.session_state.clientas["Cliente"] == clienta_elegida
+        ][0]
+        tel_actual = str(
+            st.session_state.clientas.loc[idx_cli, "Teléfono"]
+        )
+
+        nuevo_nombre_cli = st.sidebar.text_input(
+            "Nombre Actualizado", value=clienta_elegida
+        )
+        nuevo_tel_cli = st.sidebar.text_input(
+            "Nuevo Teléfono / WhatsApp", value=tel_actual
+        )
+
+        if st.sidebar.button("Actualizar Clienta"):
+            if not nuevo_nombre_cli or not nuevo_tel_cli:
+                st.sidebar.error("⚠️ Los campos no pueden estar vacíos.")
+            else:
+                st.session_state.clientas.loc[idx_cli, "Cliente"] = (
+                    nuevo_nombre_cli
+                )
+                st.session_state.clientas.loc[idx_cli, "Teléfono"] = (
+                    nuevo_tel_cli
+                )
+                guardar_datos(st.session_state.clientas, ARCH_CLIENTAS)
+                st.sidebar.success("¡Datos de la clienta actualizados con éxito!")
+                st.rerun()
 
 elif menu_opcion == "Registrar Compra / Inversión Global":
     st.sidebar.subheader("📦 Inversión y Entrada a Inventario")
