@@ -12,7 +12,7 @@ st.set_page_config(
 st.title("👜 GreisyNu Store: Control y Automatización por WhatsApp")
 st.write("Gestiona tus cuentas y envía notificaciones automáticas a tus clientas.")
 
-# Inicializar base de datos
+# Inicializar base de datos con columnas exactas (7 columnas)
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame(
         columns=[
@@ -61,9 +61,18 @@ else:
     estado = "Promoción 📢"
 
 if st.sidebar.button("Generar Registro y Mensaje de WhatsApp"):
+    # Creamos la lista asegurándonos de que sean exactamente 7 valores en orden
     nuevo_registro = pd.DataFrame(
         [[fecha, cliente, telefono, tipo_movimiento, descripcion, monto, estado]],
-        columns=st.session_state.data.columns,
+        columns=[
+            "Fecha",
+            "Cliente",
+            "Teléfono",
+            "Tipo",
+            "Descripción",
+            "Total ($)",
+            "Estado",
+        ],
     )
     st.session_state.data = pd.concat(
         [st.session_state.data, nuevo_registro], ignore_index=True
@@ -88,14 +97,14 @@ if not df.empty:
         col3.write(f"{row['Descripción']} - ${row['Total ($)']:,.2f}")
 
         # Construir mensaje personalizado según el caso
-        if "Pago Recibido" in row["Estado"]:
+        if "Pago Recibido" in str(row["Estado"]):
             texto_msj = (
                 f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store para"
                 f" confirmarte que hemos recibido tu pago por ${row['Total ($)']:,.2f}"
-                " correspondiente a: *{row['Descripción']}*. ¡Muchas gracias por"
+                f" correspondiente a: *{row['Descripción']}*. ¡Muchas gracias por"
                 " tu compra!"
             )
-        elif "Promoción" in row["Estado"]:
+        elif "Promoción" in str(row["Estado"]):
             texto_msj = row["Descripción"]
         else:
             texto_msj = (
@@ -116,7 +125,17 @@ if not df.empty:
         st.markdown("---")
 
     if st.button("🗑️ Borrar Todo el Historial"):
-        st.session_state.data = pd.DataFrame(columns=df.columns)
+        st.session_state.data = pd.DataFrame(
+            columns=[
+                "Fecha",
+                "Cliente",
+                "Teléfono",
+                "Tipo",
+                "Descripción",
+                "Total ($)",
+                "Estado",
+            ]
+        )
         st.rerun()
 else:
     st.info(
