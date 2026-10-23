@@ -10,10 +10,10 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("👜 GreisyNu Store: Control Financiero, Inventario y Ventas Sincronizadas")
+st.title("👜 GreisyNu Store: Control Financiero, Inventario y Cuentas por Cobrar")
 st.write(
-    "Tus datos ahora se guardan automáticamente para que no se pierda nada al"
-    " actualizar la página."
+    "Control absoluto de inventario, ventas, abonos, cuentas por cobrar por"
+    " clienta y reportes detallados."
 )
 
 # Definir archivos de persistencia local
@@ -157,7 +157,6 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
             )
             guardar_datos(st.session_state.compras, ARCH_COMPRAS)
 
-            # Actualizar inventario
             if (
                 not st.session_state.inventario.empty
                 and detalle_compra
@@ -530,7 +529,6 @@ else:  # Registrar Venta o Promoción
             )
             guardar_datos(st.session_state.ventas, ARCH_VENTAS)
 
-            # Descontar stock
             if tipo_movimiento == "Venta / Aviso de Pago" and cantidad_vendida > 0:
                 if (
                     not st.session_state.inventario.empty
@@ -604,9 +602,10 @@ col_m5.metric("📈 Utilidad Obtenida", f"${utilidad_obtenida:,.2f}")
 
 st.markdown("---")
 
-# Pestañas principales
-tab1, tab2, tab3, tab4 = st.tabs([
+# Pestañas principales (Añadida la pestaña de Cuentas por Cobrar)
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "💬 Historial de Ventas y WhatsApp",
+    "💳 Cuentas por Cobrar",
     "📦 Control de Inventario (Stock)",
     "👥 Directorio de Clientas",
     "📦 Registro de Compras Detallado",
@@ -683,6 +682,33 @@ with tab1:
         st.info("Aún no hay registros de ventas o mensajes.")
 
 with tab2:
+    st.subheader("💳 Cuentas por Cobrar Pendientes por Clienta")
+    if not df_ventas.empty:
+        # Filtrar solo ventas que tengan crédito pendiente mayor a 0
+        df_por_cobrar = df_ventas[
+            (df_ventas["Tipo"] == "Venta / Aviso de Pago")
+            & (df_ventas["Crédito Pendiente ($)"] > 0)
+        ]
+
+        if not df_por_cobrar.empty:
+            # Agrupar cartera total por clienta
+            df_resumen_clientes = (
+                df_por_cobrar.groupby("Cliente")["Crédito Pendiente ($)"]
+                .sum()
+                .reset_index()
+            )
+            st.markdown("### 📊 Resumen de Deuda por Clienta")
+            st.dataframe(df_resumen_clientes, use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("### 📝 Detalle de Créditos Activos")
+            st.dataframe(df_por_cobrar, use_container_width=True)
+        else:
+            st.success("🎉 ¡Excelente! No hay cuentas por cobrar pendientes en este momento. Todas las ventas están pagadas.")
+    else:
+        st.info("Aún no hay ventas registradas.")
+
+with tab3:
     st.subheader("📦 Estado Actual del Inventario")
     if not df_inventario.empty:
         st.dataframe(df_inventario, use_container_width=True)
@@ -703,7 +729,7 @@ with tab2:
             " al registrar tus compras o entradas de mercancía."
         )
 
-with tab3:
+with tab4:
     st.subheader("👥 Base de Datos de Clientas")
     if not df_clientas.empty:
         st.dataframe(df_clientas, use_container_width=True)
@@ -719,7 +745,7 @@ with tab3:
             " cuando registres ventas o usando el menú lateral."
         )
 
-with tab4:
+with tab5:
     st.subheader("📋 Detalle de Compras y Proveedores")
     if not df_compras.empty:
         st.dataframe(df_compras, use_container_width=True)
