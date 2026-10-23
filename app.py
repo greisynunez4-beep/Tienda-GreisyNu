@@ -785,6 +785,10 @@ with tab2:
             st.markdown("### 📊 Resumen de Deuda por Clienta")
             st.dataframe(df_resumen_clientes, use_container_width=True)
 
+            # Suma total de cartera pendiente
+            total_cartera_general = df_resumen_clientes["Crédito Pendiente ($)"].sum()
+            st.metric("⚠️ Total Cartera por Cobrar", f"${total_cartera_general:,.2f}")
+
             st.markdown("---")
             st.markdown("### 📝 Detalle de Créditos Activos")
             st.dataframe(df_por_cobrar, use_container_width=True)
