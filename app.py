@@ -11,11 +11,11 @@ st.set_page_config(
 
 st.title("👜 GreisyNu Store: Control Financiero y WhatsApp")
 st.write(
-    "Lleva el control de tus compras globales, tus ventas y notifica a tus"
-    " clientas al instante."
+    "Lleva el control detallado por fecha de tus inversiones, ventas y notifica"
+    " a tus clientas al instante."
 )
 
-# Inicializar bases de datos separadas para Compras y Ventas/Mensajes en la sesión
+# Inicializar bases de datos separadas para Compras y Ventas en la sesión
 if "compras" not in st.session_state:
     st.session_state.compras = pd.DataFrame(
         columns=["Fecha", "Proveedor / Detalle", "Inversión Total ($)"]
@@ -64,10 +64,14 @@ if menu_opcion == "Registrar Compra / Inversión Global":
                 [[fecha_compra, detalle_compra, total_inversion]],
                 columns=st.session_state.compras.columns,
             )
+            # Unir y ordenar por fecha descendente
             st.session_state.compras = pd.concat(
                 [st.session_state.compras, nueva_compra], ignore_index=True
             )
-            st.sidebar.success("¡Inversión en mercancía guardada con éxito!")
+            st.session_state.compras = st.session_state.compras.sort_values(
+                by="Fecha", ascending=False
+            )
+            st.sidebar.success("¡Inversión guardada con éxito!")
 
 else:
     st.sidebar.subheader("🛍️ Venta o Mensaje a Clienta")
@@ -124,8 +128,12 @@ else:
                 ]],
                 columns=st.session_state.ventas.columns,
             )
+            # Unir y ordenar por fecha descendente
             st.session_state.ventas = pd.concat(
                 [st.session_state.ventas, nueva_venta], ignore_index=True
+            )
+            st.session_state.ventas = st.session_state.ventas.sort_values(
+                by="Fecha", ascending=False
             )
             st.sidebar.success("¡Venta registrada con éxito!")
 
@@ -133,7 +141,7 @@ else:
 df_compras = st.session_state.compras
 df_ventas = st.session_state.ventas
 
-# Calcular totales generales
+# Calcular totales globales
 total_invertido_compras = (
     df_compras["Inversión Total ($)"].sum() if not df_compras.empty else 0.0
 )
@@ -159,17 +167,18 @@ col_m3.metric(
 
 st.markdown("---")
 
-# Pestañas para organizar la visualización
-tab1, tab2 = st.tabs(["💬 Historial de Ventas y WhatsApp", "📦 Registro de Compras Globales"])
+# Pestañas para organizar la visualización detallada por fecha
+tab1, tab2 = st.tabs(["💬 Historial de Ventas y WhatsApp", "📦 Registro de Compras Detallado"])
 
 with tab1:
     if not df_ventas.empty:
-        st.subheader("📋 Clientas y Envíos rápidos por WhatsApp")
+        st.subheader("📋 Ventas y Avisos Ordenados por Fecha")
 
         for index, row in df_ventas.iterrows():
             with st.container():
                 c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
 
+                c1.markdown(f"**📅 {row['Fecha']}**")
                 c1.markdown(f"**👤 {row['Cliente']}**")
                 c1.caption(f"📱 Tel: `{row['Teléfono']}`")
 
@@ -221,7 +230,8 @@ with tab1:
 
 with tab2:
     if not df_compras.empty:
-        st.subheader("📋 Historial de Inversiones en Compras Mayoristas")
+        st.subheader("📋 Compras Mayoristas Ordenadas por Fecha")
+        # Mostrar tabla organizada con las compras y sus respectivas fechas
         st.dataframe(df_compras, use_container_width=True)
 
         if st.button("🗑️ Borrar Historial de Compras"):
@@ -230,5 +240,5 @@ with tab2:
     else:
         st.info(
             "Aún no hay compras registradas. Usa el menú izquierdo para"
-            " registrar tus inversiones globales."
+            " registrar tus inversiones globales especificando su fecha."
         )
