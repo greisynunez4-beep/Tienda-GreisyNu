@@ -54,7 +54,14 @@ COLUMNAS_INVENTARIO = [
 def cargar_datos(archivo, columnas):
     if os.path.exists(archivo):
         try:
-            return pd.read_csv(archivo)
+            df = pd.read_csv(archivo)
+            # Asegurar que todas las columnas existan
+            for col in columnas:
+                if col not in df.columns:
+                    df[col] = (
+                        0.0 if "($)" in col else (1 if col == "Cantidad" else "")
+                    )
+            return df
         except Exception:
             return pd.DataFrame(columns=columnas)
     return pd.DataFrame(columns=columnas)
@@ -116,7 +123,7 @@ if menu_opcion == "Crear / Registrar Nueva Clienta":
             else:
                 df_nueva = pd.DataFrame(
                     [[nueva_cli_nombre, nueva_cli_tel]],
-                    columns=st.session_state.clientas.columns,
+                    columns=["Cliente", "Teléfono"],
                 )
                 st.session_state.clientas = pd.concat(
                     [st.session_state.clientas, df_nueva], ignore_index=True
@@ -551,7 +558,7 @@ else:  # Registrar Venta o Promoción
             ):
                 nueva_cli = pd.DataFrame(
                     [[cliente, telefono]],
-                    columns=st.session_state.clientas.columns,
+                    columns=["Cliente", "Teléfono"],
                 )
                 st.session_state.clientas = pd.concat(
                     [st.session_state.clientas, nueva_cli], ignore_index=True
@@ -683,5 +690,3 @@ with tab1:
 
 with tab2:
     st.subheader("💳 Cuentas por Cobrar Pendientes por Clienta")
-    if not df_ventas.empty:
-        df_por_cobrar = df_ventas
