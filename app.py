@@ -185,10 +185,3 @@ else:  # Registrar Venta o Promoción
     tipo_movimiento = st.sidebar.selectbox(
         "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
     )
-    fecha_venta = st.sidebar.date_input("Fecha")
-
-    if not st.session_state.clientas.empty:
-        lista_nombres = list(st.session_state.clientas["Cliente"].unique())
-        lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
-        cliente_seleccionada = st.sidebar.selectbox(
-            "Seleccionar Clienta
