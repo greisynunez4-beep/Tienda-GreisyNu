@@ -39,8 +39,14 @@ if "ventas" not in st.session_state:
 else:
     for col in COLUMNAS_VENTAS:
         if col not in st.session_state.ventas.columns:
-            if col == "Total Venta ($)" and "Precio Venta ($)" in st.session_state.ventas.columns:
-                st.session_state.ventas.rename(columns={"Precio Venta ($)": "Total Venta ($)"}, inplace=True)
+            if (
+                col == "Total Venta ($)"
+                and "Precio Venta ($)" in st.session_state.ventas.columns
+            ):
+                st.session_state.ventas.rename(
+                    columns={"Precio Venta ($)": "Total Venta ($)"},
+                    inplace=True,
+                )
             else:
                 st.session_state.ventas[col] = 0.0 if "($)" in col else ""
 
@@ -181,4 +187,8 @@ else:  # Registrar Venta o Promoción
     )
     fecha_venta = st.sidebar.date_input("Fecha")
 
-    if not
+    if not st.session_state.clientas.empty:
+        lista_nombres = list(st.session_state.clientas["Cliente"].unique())
+        lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
+        cliente_seleccionada = st.sidebar.selectbox(
+            "Seleccionar Clienta
