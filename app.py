@@ -43,7 +43,7 @@ COLUMNAS_INVENTARIO = [
     "Precio Venta Sugerido ($)",
 ]
 
-# Inicializar o reparar bases de datos en la sesión para evitar pérdidas
+# Inicializar bases de datos en la sesión para que no se pierda nada
 if "compras" not in st.session_state:
     st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
 
@@ -419,7 +419,6 @@ else:  # Registrar Venta o Promoción
                 "Total Venta ($)", min_value=0.0, value=50000.0, step=1000.0
             )
         else:
-            # Selector directo desde el Inventario
             lista_prods = list(st.session_state.inventario["Producto"].unique())
             producto_elegido = st.sidebar.selectbox(
                 "Seleccionar Producto del Inventario", lista_prods
@@ -569,7 +568,6 @@ else:
     total_abonos_recibidos = 0.0
     total_creditos_pendientes = 0.0
 
-# Fórmula de Utilidad: Ventas Totales menos Abonos
 utilidad_obtenida = total_ingresos_ventas - total_abonos_recibidos
 
 # Tarjetas de Resumen Financiero Global (5 tarjetas)
