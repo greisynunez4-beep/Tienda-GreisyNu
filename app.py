@@ -4,18 +4,18 @@ import streamlit as st
 
 # Configuración de la página
 st.set_page_config(
-    page_title="GreisyNu Store - Control y WhatsApp",
+    page_title="GreisyNu Store - Control y Clientas",
     page_icon="👜",
     layout="wide",
 )
 
-st.title("👜 GreisyNu Store: Control Financiero y WhatsApp")
+st.title("👜 GreisyNu Store: Control Financiero y Directorio de Clientas")
 st.write(
-    "Lleva el control detallado por fecha de tus inversiones, ventas y notifica"
-    " a tus clientas al instante."
+    "Lleva el control de tus finanzas, el historial detallado y tu base de datos"
+    " de clientas en un solo lugar."
 )
 
-# Inicializar bases de datos separadas para Compras y Ventas en la sesión
+# Inicializar bases de datos en la sesión
 if "compras" not in st.session_state:
     st.session_state.compras = pd.DataFrame(
         columns=["Fecha", "Proveedor / Detalle", "Inversión Total ($)"]
@@ -64,7 +64,6 @@ if menu_opcion == "Registrar Compra / Inversión Global":
                 [[fecha_compra, detalle_compra, total_inversion]],
                 columns=st.session_state.compras.columns,
             )
-            # Unir y ordenar por fecha descendente
             st.session_state.compras = pd.concat(
                 [st.session_state.compras, nueva_compra], ignore_index=True
             )
@@ -128,7 +127,6 @@ else:
                 ]],
                 columns=st.session_state.ventas.columns,
             )
-            # Unir y ordenar por fecha descendente
             st.session_state.ventas = pd.concat(
                 [st.session_state.ventas, nueva_venta], ignore_index=True
             )
@@ -137,7 +135,7 @@ else:
             )
             st.sidebar.success("¡Venta registrada con éxito!")
 
-# --- PANEL PRINCIPAL: RESUMEN Y WHATSAPP ---
+# --- PANEL PRINCIPAL: RESUMEN Y PESTAÑAS ---
 df_compras = st.session_state.compras
 df_ventas = st.session_state.ventas
 
@@ -167,8 +165,12 @@ col_m3.metric(
 
 st.markdown("---")
 
-# Pestañas para organizar la visualización detallada por fecha
-tab1, tab2 = st.tabs(["💬 Historial de Ventas y WhatsApp", "📦 Registro de Compras Detallado"])
+# Pestañas principales de navegación
+tab1, tab2, tab3 = st.tabs([
+    "💬 Historial de Ventas y WhatsApp",
+    "👥 Directorio de Clientas",
+    "📦 Registro de Compras Detallado",
+])
 
 with tab1:
     if not df_ventas.empty:
@@ -229,9 +231,32 @@ with tab1:
         st.info("Aún no hay registros de ventas o mensajes.")
 
 with tab2:
+    st.subheader("👥 Base de Datos de Clientas")
+    if not df_ventas.empty:
+        # Agrupar por clienta y teléfono para mostrar un directorio limpio
+        directorio = (
+            df_ventas.groupby(["Cliente", "Teléfono"])
+            .agg(
+                Total_Interacciones=("Fecha", "count"),
+                Ultima_Fecha=("Fecha", "max"),
+            )
+            .reset_index()
+        )
+
+        st.dataframe(directorio, use_container_width=True)
+        st.success(
+            f"Tienes un total de **{len(directorio)} clientas** registradas en"
+            " GreisyNu Store."
+        )
+    else:
+        st.info(
+            "Aún no hay clientas registradas. Aparecerán aquí automáticamente"
+            " cuando registres ventas o promociones."
+        )
+
+with tab3:
     if not df_compras.empty:
         st.subheader("📋 Compras Mayoristas Ordenadas por Fecha")
-        # Mostrar tabla organizada con las compras y sus respectivas fechas
         st.dataframe(df_compras, use_container_width=True)
 
         if st.button("🗑️ Borrar Historial de Compras"):
@@ -240,5 +265,5 @@ with tab2:
     else:
         st.info(
             "Aún no hay compras registradas. Usa el menú izquierdo para"
-            " registrar tus inversiones globales especificando su fecha."
+            " registrar tus inversiones globales."
         )
