@@ -43,18 +43,12 @@ COLUMNAS_INVENTARIO = [
     "Precio Venta Sugerido ($)",
 ]
 
-# Inicializar o reparar bases de datos en la sesión si faltan columnas
+# Inicializar o reparar bases de datos en la sesión para evitar pérdidas
 if "compras" not in st.session_state:
     st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
 
 if "ventas" not in st.session_state:
     st.session_state.ventas = pd.DataFrame(columns=COLUMNAS_VENTAS)
-else:
-    for col in COLUMNAS_VENTAS:
-        if col not in st.session_state.ventas.columns:
-            st.session_state.ventas[col] = (
-                0.0 if "($)" in col else (1 if col == "Cantidad" else "")
-            )
 
 if "clientas" not in st.session_state:
     st.session_state.clientas = pd.DataFrame(columns=["Cliente", "Teléfono"])
