@@ -10,10 +10,10 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("👜 GreisyNu Store: Control Financiero, Inventario y Cuentas por Cobrar")
+st.title("👜 GreisyNu Store: Control Financiero, Inventario y Utilidad Real")
 st.write(
-    "Control absoluto de inventario, ventas, abonos, cuentas por cobrar por"
-    " clienta y reportes detallados."
+    "Control absoluto de inventario, ventas, abonos, cuentas por cobrar y"
+    " utilidad (Ventas Totales - Compras)."
 )
 
 # Definir archivos de persistencia local
@@ -590,7 +590,8 @@ else:
     total_abonos_recibidos = 0.0
     total_creditos_pendientes = 0.0
 
-utilidad_obtenida = total_ingresos_ventas - total_abonos_recibidos
+# Fórmula de Utilidad: Ventas Totales menos el Costo de las Compras
+utilidad_obtenida = total_ingresos_ventas - total_invertido_compras
 
 # Tarjetas de Resumen Financiero Global (5 tarjetas)
 col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
@@ -602,7 +603,7 @@ col_m5.metric("📈 Utilidad Obtenida", f"${utilidad_obtenida:,.2f}")
 
 st.markdown("---")
 
-# Pestañas principales (Añadida la pestaña de Cuentas por Cobrar)
+# Pestañas principales
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "💬 Historial de Ventas y WhatsApp",
     "💳 Cuentas por Cobrar",
@@ -615,148 +616,4 @@ with tab1:
     if not df_ventas.empty:
         st.subheader("📋 Ventas, Abonos y Créditos Ordenados por Fecha")
 
-        for index, row in df_ventas.iterrows():
-            with st.container():
-                c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
-
-                c1.markdown(f"**📅 {row['Fecha']}**")
-                c1.markdown(f"**👤 {row['Cliente']}**")
-                c1.caption(f"📱 Tel: `{row['Teléfono']}`")
-
-                c2.markdown(f"**Estado:** {row['Estado']}")
-
-                if row["Tipo"] == "Venta / Aviso de Pago":
-                    c3.markdown(
-                        f"**Prod:** {row['Descripción']} (Cant:"
-                        f" {row.get('Cantidad', 1)}) <br> **Total:**"
-                        f" ${row['Total Venta ($)']:,.2f} <br> **Abono:**"
-                        f" ${row['Abono ($)']:,.2f} <br> **Pendiente:**"
-                        f" 🔴 ${row['Crédito Pendiente ($)']:,.2f}",
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    c3.markdown(f"**Promoción:** {row['Descripción']}")
-
-                if "Pagado Completo" in str(row["Estado"]):
-                    texto_msj = (
-                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
-                        f" para confirmarte que hemos recibido tu pago total por"
-                        f" ${row['Total Venta ($)']:,.2f} correspondiente a:"
-                        f" *{row['Descripción']}*. ¡Muchas gracias por tu"
-                        " compra!"
-                    )
-                elif "Abono" in str(row["Estado"]):
-                    texto_msj = (
-                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
-                        f" para confirmarte tu abono de ${row['Abono ($)']:,.2f}."
-                        f" El total de tu compra es ${row['Total Venta ($)']:,.2f}"
-                        f" y te queda un saldo pendiente de"
-                        f" ${row['Crédito Pendiente ($)']:,.2f} por:"
-                        f" *{row['Descripción']}*. ¡Gracias!"
-                    )
-                elif "Promoción" in str(row["Estado"]):
-                    texto_msj = row["Descripción"]
-                else:
-                    texto_msj = (
-                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
-                        f" para recordarte que tienes un saldo pendiente de"
-                        f" ${row['Crédito Pendiente ($)']:,.2f} por tu compra"
-                        f" de: *{row['Descripción']}*."
-                    )
-
-                mensaje_codificado = urllib.parse.quote(texto_msj)
-                link_wsp = (
-                    f"https://wa.me/{row['Teléfono']}?text={mensaje_codificado}"
-                )
-
-                c4.markdown(
-                    f"[💬 Enviar a WhatsApp]({link_wsp})", unsafe_allow_html=True
-                )
-                st.markdown("---")
-
-        if st.button("🗑️ Borrar Historial de Ventas"):
-            st.session_state.ventas = pd.DataFrame(columns=COLUMNAS_VENTAS)
-            guardar_datos(st.session_state.ventas, ARCH_VENTAS)
-            st.rerun()
-    else:
-        st.info("Aún no hay registros de ventas o mensajes.")
-
-with tab2:
-    st.subheader("💳 Cuentas por Cobrar Pendientes por Clienta")
-    if not df_ventas.empty:
-        # Filtrar solo ventas que tengan crédito pendiente mayor a 0
-        df_por_cobrar = df_ventas[
-            (df_ventas["Tipo"] == "Venta / Aviso de Pago")
-            & (df_ventas["Crédito Pendiente ($)"] > 0)
-        ]
-
-        if not df_por_cobrar.empty:
-            # Agrupar cartera total por clienta
-            df_resumen_clientes = (
-                df_por_cobrar.groupby("Cliente")["Crédito Pendiente ($)"]
-                .sum()
-                .reset_index()
-            )
-            st.markdown("### 📊 Resumen de Deuda por Clienta")
-            st.dataframe(df_resumen_clientes, use_container_width=True)
-
-            st.markdown("---")
-            st.markdown("### 📝 Detalle de Créditos Activos")
-            st.dataframe(df_por_cobrar, use_container_width=True)
-        else:
-            st.success("🎉 ¡Excelente! No hay cuentas por cobrar pendientes en este momento. Todas las ventas están pagadas.")
-    else:
-        st.info("Aún no hay ventas registradas.")
-
-with tab3:
-    st.subheader("📦 Estado Actual del Inventario")
-    if not df_inventario.empty:
-        st.dataframe(df_inventario, use_container_width=True)
-        st.success(
-            f"Tienes **{len(df_inventario)} productos** diferentes registrados en"
-            " stock."
-        )
-
-        if st.button("🗑️ Borrar Inventario Completo"):
-            st.session_state.inventario = pd.DataFrame(
-                columns=COLUMNAS_INVENTARIO
-            )
-            guardar_datos(st.session_state.inventario, ARCH_INVENTARIO)
-            st.rerun()
-    else:
-        st.info(
-            "Aún no hay productos en el inventario. Se llenará automáticamente"
-            " al registrar tus compras o entradas de mercancía."
-        )
-
-with tab4:
-    st.subheader("👥 Base de Datos de Clientas")
-    if not df_clientas.empty:
-        st.dataframe(df_clientas, use_container_width=True)
-        st.success(f"Tienes un total de **{len(df_clientas)} clientas** guardadas.")
-
-        if st.button("🗑️ Borrar Directorio de Clientas"):
-            st.session_state.clientas = pd.DataFrame(columns=["Cliente", "Teléfono"])
-            guardar_datos(st.session_state.clientas, ARCH_CLIENTAS)
-            st.rerun()
-    else:
-        st.info(
-            "Aún no hay clientas registradas. Se guardarán automáticamente aquí"
-            " cuando registres ventas o usando el menú lateral."
-        )
-
-with tab5:
-    st.subheader("📋 Detalle de Compras y Proveedores")
-    if not df_compras.empty:
-        st.dataframe(df_compras, use_container_width=True)
-        st.success(f"Tienes un total de **{len(df_compras)} registros** de compras.")
-
-        if st.button("🗑️ Borrar Historial de Compras"):
-            st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
-            guardar_datos(st.session_state.compras, ARCH_COMPRAS)
-            st.rerun()
-    else:
-        st.info(
-            "Aún no hay compras registradas. Usa el menú izquierdo en"
-            " 'Registrar Compra / Inversión Global'."
-        )
+        for index, row in df_vent
