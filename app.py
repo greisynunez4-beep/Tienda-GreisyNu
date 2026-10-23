@@ -13,7 +13,7 @@ st.set_page_config(
 st.title("👜 GreisyNu Store: Control Financiero, Inventario y Utilidad Real")
 st.write(
     "Control absoluto de inventario, ventas, abonos, cuentas por cobrar y"
-    " utilidad detallada por cada venta realizada."
+    " utilidad detallada por cada compra y producto."
 )
 
 # Definir archivos de persistencia local
@@ -805,10 +805,55 @@ with tab4:
         )
 
 with tab5:
-    st.subheader("📋 Detalle de Compras y Proveedores")
+    st.subheader("📋 Detalle de Compras, Ventas y Utilidad")
     if not df_compras.empty:
-        st.dataframe(df_compras, use_container_width=True)
-        st.success(f"Tienes un total de **{len(df_compras)} registros** de compras.")
+        lista_resultado_compras = []
+        for idx, row_c in df_compras.iterrows():
+            prod_nombre = row_c["Proveedor / Detalle"]
+            inv_total = float(row_c["Inversión Total ($)"])
+            cant_compra = float(row_c["Cantidad"])
+
+            ventas_prod = 0.0
+            if not df_ventas.empty and "Descripción" in df_ventas.columns:
+                df_match = df_ventas[
+                    (df_ventas["Tipo"] == "Venta / Aviso de Pago")
+                    & (df_ventas["Descripción"] == prod_nombre)
+                ]
+                if not df_match.empty:
+                    ventas_prod = df_match["Total Venta ($)"].sum()
+
+            utilidad_prod = ventas_prod - inv_total
+
+            lista_resultado_compras.append({
+                "Fecha": row_c["Fecha"],
+                "Proveedor / Detalle": prod_nombre,
+                "Cantidad Comprada": cant_compra,
+                "Inversión Compras ($)": inv_total,
+                "Ventas Totales ($)": ventas_prod,
+                "Utilidad ($)": utilidad_prod,
+            })
+
+        df_reporte_compras = pd.DataFrame(lista_resultado_compras)
+
+        st.dataframe(df_reporte_compras, use_container_width=True)
+
+        suma_inversion = df_reporte_compras["Inversión Compras ($)"].sum()
+        suma_ventas = df_reporte_compras["Ventas Totales ($)"].sum()
+        suma_utilidad = df_reporte_compras["Utilidad ($)"].sum()
+
+        st.markdown("### 📊 Resumen General de Inversión y Utilidad en Compras")
+        col_c1, col_c2, col_c3 = st.columns(3)
+        col_c1.metric("📦 Total Compras", f"${suma_inversion:,.2f}")
+        col_c2.metric("💰 Total Ventas", f"${suma_ventas:,.2f}")
+        col_c3.metric(
+            "📈 Utilidad Total Neta",
+            f"${suma_utilidad:,.2f}",
+            delta=(
+                "Ganancia"
+                if suma_utilidad >= 0
+                else "Pérdida / Inversión pendiente"
+            ),
+        )
 
         if st.button("🗑️ Borrar Historial de Compras"):
             st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
