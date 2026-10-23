@@ -37,7 +37,6 @@ if "compras" not in st.session_state:
 if "ventas" not in st.session_state:
     st.session_state.ventas = pd.DataFrame(columns=COLUMNAS_VENTAS)
 else:
-    # Solución automática por si quedaron columnas viejas (ej. "Precio Venta ($)")
     for col in COLUMNAS_VENTAS:
         if col not in st.session_state.ventas.columns:
             if col == "Total Venta ($)" and "Precio Venta ($)" in st.session_state.ventas.columns:
@@ -171,103 +170,4 @@ else:  # Registrar Venta o Promoción
         )
 
         # Calcular crédito pendiente automáticamente
-        credito_pendiente = max(0.0, total_venta - abono)
-        st.sidebar.info(f"📉 Crédito Pendiente: ${credito_pendiente:,.2f}")
-
-        if credito_pendiente == 0:
-            estado = "Pagado Completo 🟢"
-        elif abono > 0:
-            estado = "Abono / Parcial 🟡"
-        else:
-            estado = "Crédito Pendiente 🔴"
-    else:
-        descripcion = st.sidebar.text_area(
-            "Texto de la Promoción",
-            value=(
-                "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
-                " accesorios disponibles. ¿Te gustaría ver el catálogo?"
-            ),
-        )
-        total_venta = 0.0
-        abono = 0.0
-        credito_pendiente = 0.0
-        estado = "Promoción 📢"
-
-    if st.sidebar.button("Guardar Venta y Generar WhatsApp"):
-        if not cliente or not telefono:
-            st.sidebar.error(
-                "⚠️ Por favor, asegúrate de ingresar el nombre y el teléfono."
-            )
-        else:
-            nueva_venta = pd.DataFrame(
-                [[
-                    fecha_venta,
-                    cliente,
-                    telefono,
-                    tipo_movimiento,
-                    descripcion,
-                    total_venta,
-                    abono,
-                    credito_pendiente,
-                    estado,
-                ]],
-                columns=COLUMNAS_VENTAS,
-            )
-            st.session_state.ventas = pd.concat(
-                [st.session_state.ventas, nueva_venta], ignore_index=True
-            )
-            st.session_state.ventas = st.session_state.ventas.sort_values(
-                by="Fecha", ascending=False
-            )
-
-            # Guardar automáticamente la clienta si no estaba
-            if (
-                st.session_state.clientas.empty
-                or cliente not in st.session_state.clientas["Cliente"].values
-            ):
-                nueva_cli = pd.DataFrame(
-                    [[cliente, telefono]],
-                    columns=st.session_state.clientas.columns,
-                )
-                st.session_state.clientas = pd.concat(
-                    [st.session_state.clientas, nueva_cli], ignore_index=True
-                )
-
-            st.sidebar.success("¡Venta registrada con éxito!")
-
-# --- PANEL PRINCIPAL: RESUMEN Y PESTAÑAS ---
-df_compras = st.session_state.compras
-df_ventas = st.session_state.ventas
-df_clientas = st.session_state.clientas
-
-# Calcular totales globales de forma segura
-total_invertido_compras = (
-    df_compras["Inversión Total ($)"].sum() if not df_compras.empty else 0.0
-)
-
-if not df_ventas.empty and "Total Venta ($)" in df_ventas.columns:
-    df_solo_ventas = df_ventas[df_ventas["Tipo"] == "Venta / Aviso de Pago"]
-    total_ingresos_ventas = (
-        df_solo_ventas["Total Venta ($)"].sum()
-        if not df_solo_ventas.empty
-        else 0.0
-    )
-    total_abonos_recibidos = (
-        df_solo_ventas["Abono ($)"].sum() if not df_solo_ventas.empty else 0.0
-    )
-    total_creditos_pendientes = (
-        df_solo_ventas["Crédito Pendiente ($)"].sum()
-        if not df_solo_ventas.empty
-        else 0.0
-    )
-else:
-    total_ingresos_ventas = 0.0
-    total_abonos_recibidos = 0.0
-    total_creditos_pendientes = 0.0
-
-# Tarjetas de Resumen Financiero Global
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-col_m1.metric("📦 Inversión Compras", f"${total_invertido_compras:,.2f}")
-col_m2.metric("💰 Ventas Totales", f"${total_ingresos_ventas:,.2f}")
-col_m3.metric("📥 Abonos Recibidos", f"${total_abonos_recibidos:,.2f}")
-col_m4.metric("⚠️ Crédito Pendiente", f
+        credito_pendiente = max(0.0, total_venta -
