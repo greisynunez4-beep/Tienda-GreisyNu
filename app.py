@@ -1,135 +1,125 @@
+import urllib.parse
 import pandas as pd
 import streamlit as st
 
 # Configuración de la página
 st.set_page_config(
-    page_title="GreisyNu Store - Control Financiero", page_icon="👜", layout="wide"
+    page_title="GreisyNu Store - Gestión y WhatsApp",
+    page_icon="👜",
+    layout="wide",
 )
 
-# Título principal
-st.title("👜 GreisyNu Store: Control de Cuentas y Ganancias")
-st.write(
-    "Registra tus ventas y costos para calcular automáticamente tus márgenes de ganancia neta."
-)
+st.title("👜 GreisyNu Store: Control y Automatización por WhatsApp")
+st.write("Gestiona tus cuentas y envía notificaciones automáticas a tus clientas.")
 
-# Inicializar base de datos en memoria
+# Inicializar base de datos
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame(
         columns=[
             "Fecha",
+            "Cliente",
+            "Teléfono",
             "Tipo",
-            "Categoría",
             "Descripción",
-            "Cantidad",
-            "Costo Unitario ($)",
-            "Precio Venta ($)",
-            "Ingreso Total ($)",
-            "Costo Total ($)",
-            "Ganancia Neta ($)",
-            "Margen (%)",
+            "Total ($)",
+            "Estado",
         ]
     )
 
-# --- MENÚ LATERAL: REGISTRAR MOVIMIENTOS ---
-st.sidebar.header("📝 Registrar Movimiento")
+# --- MENÚ LATERAL: REGISTRAR Y CONECTAR WHATSAPP ---
+st.sidebar.header("📝 Registrar Venta o Pago")
 
+cliente = st.sidebar.text_input("Nombre de la Clienta", placeholder="Ej. María Pérez")
+telefono = st.sidebar.text_input(
+    "Teléfono (con código de país)", placeholder="Ej. 573001234567"
+)
 tipo_movimiento = st.sidebar.selectbox(
-    "Tipo", ["Ingreso (Venta)", "Gasto Operativo (Publicidad/Envíos)"]
+    "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
 )
 fecha = st.sidebar.date_input("Fecha")
-descripcion = st.sidebar.text_input(
-    "Descripción", placeholder="Ej. Bolso Bandolera Negro / Empaques"
-)
-cantidad = st.sidebar.number_input("Cantidad", min_value=1, value=1, step=1)
 
-if tipo_movimiento == "Ingreso (Venta)":
-    categoria = st.sidebar.selectbox(
-        "Categoría", ["Bolsos", "Accesorios / Joyería", "Otros"]
+if tipo_movimiento == "Venta / Aviso de Pago":
+    descripcion = st.sidebar.text_input(
+        "Detalle del Producto", placeholder="Ej. Bolso Bandolera Negro"
     )
-    costo_unitario = st.sidebar.number_input(
-        "Costo de Compra (Mayorista) por unidad ($)", min_value=0.0, value=0.0, step=1000.0
+    monto = st.sidebar.number_input(
+        "Monto Total ($)", min_value=0.0, value=0.0, step=1000.0
     )
-    precio_unitario = st.sidebar.number_input(
-        "Precio de Venta al Público por unidad ($)", min_value=0.0, value=0.0, step=1000.0
+    estado = st.sidebar.selectbox(
+        "Estado del Pago", ["Pago Recibido 🟢", "Pendiente de Pago 🟡"]
     )
 else:
-    categoria = st.sidebar.selectbox(
-        "Categoría", ["Envíos / Delivery", "Publicidad", "Empaques", "Otros Gastos"]
+    descripcion = st.sidebar.text_area(
+        "Texto de la Promoción",
+        value=(
+            "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nueva colección"
+            " de bolsos y accesorios en rodio disponibles. ¿Te gustaría ver el"
+            " catálogo?"
+        ),
     )
-    costo_unitario = 0.0
-    precio_unitario = st.sidebar.number_input(
-        "Monto Total del Gasto ($)", min_value=0.0, value=0.0, step=1000.0
-    )
+    monto = 0.0
+    estado = "Promoción 📢"
 
-if st.sidebar.button("Guardar Registro"):
-    if tipo_movimiento == "Ingreso (Venta)":
-        ingreso_total = cantidad * precio_unitario
-        costo_total = cantidad * costo_unitario
-        ganancia_neta = ingreso_total - costo_total
-        margen = (ganancia_neta / ingreso_total * 100) if ingreso_total > 0 else 0
-    else:
-        ingreso_total = 0.0
-        costo_total = cantidad * precio_unitario  # El gasto total
-        ganancia_neta = -costo_total
-        margen = 0.0
-
+if st.sidebar.button("Generar Registro y Mensaje de WhatsApp"):
     nuevo_registro = pd.DataFrame(
-        [[
-            fecha,
-            tipo_movimiento,
-            categoria,
-            descripcion,
-            cantidad,
-            costo_unitario,
-            precio_unitario,
-            ingreso_total,
-            costo_total,
-            ganancia_neta,
-            margen,
-        ]],
+        [[fecha, cliente, telefono, tipo_movimiento, descripcion, monto, estado]],
         columns=st.session_state.data.columns,
     )
     st.session_state.data = pd.concat(
         [st.session_state.data, nuevo_registro], ignore_index=True
     )
-    st.sidebar.success("¡Registro guardado con éxito!")
+    st.sidebar.success("¡Guardado con éxito!")
 
-# --- PANEL PRINCIPAL: RESUMEN Y ESTADÍSTICAS ---
+# --- PANEL PRINCIPAL ---
 df = st.session_state.data
 
 if not df.empty:
-    # Filtrar solo ventas para calcular métricas comerciales limpias
-    df_ventas = df[df["Tipo"] == "Ingreso (Venta)"]
-    df_gastos = df[df["Tipo"] != "Ingreso (Venta)"]
+    st.subheader("📋 Historial y Envíos rápidos por WhatsApp")
+    st.write(
+        "Haz clic en el botón de WhatsApp de cada fila para abrir el chat"
+        " directamente con tu clienta y enviarle el mensaje."
+    )
 
-    total_ingresos = df_ventas["Ingreso Total ($)"].sum()
-    total_costos_mercancia = df_ventas["Costo Total ($)"].sum()
-    total_gastos_operativos = df_gastos["Costo Total ($)"].sum()
-    
-    # Ganancia Neta Real = (Ventas - Costo Mercancía) - Gastos Operativos
-    ganancia_bruta = total_ingresos - total_costos_mercancia
-    ganancia_neta_total = ganancia_bruta - total_gastos_operativos
+    # Mostrar tabla interactiva con generador de enlaces de WhatsApp
+    for index, row in df.iterrows():
+        col1, col2, col3, col4 = st.columns([2, 2, 3, 2])
+        col1.write(f"**{row['Cliente']}** ({row['Teléfono']})")
+        col2.write(f"{row['Estado']}")
+        col3.write(f"{row['Descripción']} - ${row['Total ($)']:,.2f}")
 
-    # Mostrar métricas clave en tarjetas
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Ventas Totales", f"${total_ingresos:,.2f}")
-    col2.metric("📦 Costo de Mercancía", f"${total_costos_mercancia:,.2f}")
-    col3.metric("💸 Gastos Operativos", f"${total_gastos_operativos:,.2f}")
-    
-    if ganancia_neta_total >= 0:
-        col4.metric("📈 Ganancia Neta Real", f"${ganancia_neta_total:,.2f}", delta="Rentable")
-    else:
-        col4.metric("📉 Ganancia Neta Real", f"${ganancia_neta_total:,.2f}", delta="En negativo", delta_color="inverse")
+        # Construir mensaje personalizado según el caso
+        if "Pago Recibido" in row["Estado"]:
+            texto_msj = (
+                f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store para"
+                f" confirmarte que hemos recibido tu pago por ${row['Total ($)']:,.2f}"
+                " correspondiente a: *{row['Descripción']}*. ¡Muchas gracias por"
+                " tu compra!"
+            )
+        elif "Promoción" in row["Estado"]:
+            texto_msj = row["Descripción"]
+        else:
+            texto_msj = (
+                f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store para"
+                f" recordarte que tienes un saldo pendiente de ${row['Total ($)']:,.2f}"
+                f" por: *{row['Descripción']}*."
+            )
 
-    st.markdown("---")
+        # Codificar el texto para la URL de WhatsApp
+        mensaje_codificado = urllib.parse.quote(texto_msj)
+        link_wsp = (
+            f"https://wa.me/{row['Teléfono']}?text={mensaje_codificado}"
+        )
 
-    # Tabla detallada de movimientos
-    st.subheader("📋 Historial Detallado de GreisyNu Store")
-    st.dataframe(df, use_container_width=True)
+        col4.markdown(
+            f"[💬 Enviar WhatsApp]({link_wsp})", unsafe_allow_html=True
+        )
+        st.markdown("---")
 
-    # Botón para limpiar datos
     if st.button("🗑️ Borrar Todo el Historial"):
         st.session_state.data = pd.DataFrame(columns=df.columns)
         st.rerun()
 else:
-    st.info("Aún no hay registros. Utiliza el panel de la izquierda para registrar tus ventas y gastos.")
+    st.info(
+        "Aún no hay registros. Usa el panel izquierdo para agregar una venta o"
+        " promoción."
+    )
