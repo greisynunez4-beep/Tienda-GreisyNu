@@ -9,10 +9,10 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("👜 GreisyNu Store: Control Financiero, Inventario y Clientas")
+st.title("👜 GreisyNu Store: Control Financiero, Inventario y Ventas Sincronizadas")
 st.write(
-    "Control total: inventario sincronizado, ventas, compras detalladas y"
-    " notificaciones por WhatsApp."
+    "Control absoluto de tu inventario, ventas con selección de stock, abonos,"
+    " créditos y reportes detallados."
 )
 
 # Definir las columnas oficiales exactas
@@ -22,6 +22,7 @@ COLUMNAS_VENTAS = [
     "Teléfono",
     "Tipo",
     "Descripción",
+    "Cantidad",
     "Total Venta ($)",
     "Abono ($)",
     "Crédito Pendiente ($)",
@@ -51,16 +52,9 @@ if "ventas" not in st.session_state:
 else:
     for col in COLUMNAS_VENTAS:
         if col not in st.session_state.ventas.columns:
-            if (
-                col == "Total Venta ($)"
-                and "Precio Venta ($)" in st.session_state.ventas.columns
-            ):
-                st.session_state.ventas.rename(
-                    columns={"Precio Venta ($)": "Total Venta ($)"},
-                    inplace=True,
-                )
-            else:
-                st.session_state.ventas[col] = 0.0 if "($)" in col else ""
+            st.session_state.ventas[col] = (
+                0.0 if "($)" in col else (1 if col == "Cantidad" else "")
+            )
 
 if "clientas" not in st.session_state:
     st.session_state.clientas = pd.DataFrame(columns=["Cliente", "Teléfono"])
@@ -144,6 +138,7 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
                 by="Fecha", ascending=False
             )
 
+            # Actualizar inventario automáticamente
             if (
                 not st.session_state.inventario.empty
                 and detalle_compra
@@ -158,7 +153,7 @@ elif menu_opcion == "Registrar Compra / Inversión Global":
             else:
                 precio_sug_def = (
                     total_inversion / cantidad_comprada
-                ) * 1.5
+                ) * 1.5  # Margen sugerido del 50%
                 nuevo_prod = pd.DataFrame(
                     [[detalle_compra, "General", cantidad_comprada, precio_sug_def]],
                     columns=COLUMNAS_INVENTARIO,
@@ -233,7 +228,6 @@ elif menu_opcion == "📦 Control de Inventario (Entradas/Salidas)":
                         f"¡Nuevo producto `{prod_nombre}` registrado con"
                         f" éxito!"
                     )
-
     else:
         if st.session_state.inventario.empty:
             st.sidebar.warning(
@@ -253,7 +247,7 @@ elif menu_opcion == "📦 Control de Inventario (Entradas/Salidas)":
             st.sidebar.info(f"📦 Stock disponible actual: `{stock_actual}`")
 
             cant_salida = st.sidebar.number_input(
-                "Cantidad a retirar / vender",
+                "Cantidad a retirar",
                 min_value=1,
                 max_value=max(1, stock_actual),
                 value=1,
@@ -352,4 +346,371 @@ elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
         )
 
         nuevo_credito = max(0.0, nuevo_total - nuevo_abono)
-        st
+        st.sidebar.info(f"📉 Nuevo Crédito Pendiente: ${nuevo_credito:,.2f}")
+
+        if nuevo_credito == 0:
+            nuevo_estado = "Pagado Completo 🟢"
+        elif nuevo_abono > 0:
+            nuevo_estado = "Abono / Parcial 🟡"
+        else:
+            nuevo_estado = "Crédito Pendiente 🔴"
+
+        st.sidebar.write(f"**Nuevo Estado:** {nuevo_estado}")
+
+        if st.sidebar.button("Actualizar Venta"):
+            st.session_state.ventas.loc[idx_edit, "Total Venta ($)"] = (
+                nuevo_total
+            )
+            st.session_state.ventas.loc[idx_edit, "Abono ($)"] = nuevo_abono
+            st.session_state.ventas.loc[idx_edit, "Crédito Pendiente ($)"] = (
+                nuevo_credito
+            )
+            st.session_state.ventas.loc[idx_edit, "Estado"] = nuevo_estado
+            st.sidebar.success("¡Venta actualizada con éxito!")
+            st.rerun()
+
+else:  # Registrar Venta o Promoción
+    st.sidebar.subheader("🛍️ Venta o Mensaje a Clienta")
+    tipo_movimiento = st.sidebar.selectbox(
+        "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
+    )
+    fecha_venta = st.sidebar.date_input("Fecha")
+
+    # Selección de Clienta
+    if not st.session_state.clientas.empty:
+        lista_nombres = list(st.session_state.clientas["Cliente"].unique())
+        lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
+        cliente_seleccionada = st.sidebar.selectbox(
+            "Seleccionar Clienta Guardada", lista_nombres
+        )
+
+        if cliente_seleccionada != "-- Escribir nueva o seleccionar --":
+            cliente = cliente_seleccionada
+            telefono = str(
+                st.session_state.clientas.loc[
+                    st.session_state.clientas["Cliente"] == cliente, "Teléfono"
+                ].values[0]
+            )
+            st.sidebar.info(f"📱 Teléfono cargado: `{telefono}`")
+        else:
+            cliente = st.sidebar.text_input(
+                "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
+            )
+            telefono = st.sidebar.text_input(
+                "Teléfono", placeholder="573001234567"
+            )
+    else:
+        st.sidebar.warning(
+            "💡 No tienes clientas guardadas aún. Puedes agregarlas en la opción"
+            " 'Crear / Registrar Nueva Clienta'."
+        )
+        cliente = st.sidebar.text_input(
+            "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
+        )
+        telefono = st.sidebar.text_input("Teléfono", placeholder="573001234567")
+
+    if tipo_movimiento == "Venta / Aviso de Pago":
+        if st.session_state.inventario.empty:
+            st.sidebar.warning(
+                "⚠️ No tienes productos en el inventario. Agrega productos"
+                " primero en 'Control de Inventario'."
+            )
+            descripcion = st.sidebar.text_input(
+                "Detalle del Producto", placeholder="Ej. Bolso"
+            )
+            cantidad_vendida = st.sidebar.number_input(
+                "Cantidad", min_value=1, value=1
+            )
+            total_venta = st.sidebar.number_input(
+                "Total Venta ($)", min_value=0.0, value=50000.0, step=1000.0
+            )
+        else:
+            # Selector directo desde el Inventario
+            lista_prods = list(st.session_state.inventario["Producto"].unique())
+            producto_elegido = st.sidebar.selectbox(
+                "Seleccionar Producto del Inventario", lista_prods
+            )
+
+            fila_prod = st.session_state.inventario.loc[
+                st.session_state.inventario["Producto"] == producto_elegido
+            ].iloc[0]
+            stock_disp = int(fila_prod["Stock Actual"])
+            precio_sug = float(fila_prod["Precio Venta Sugerido ($)"])
+
+            st.sidebar.info(
+                f"📦 Stock Disponible: **{stock_disp}** | 💲 Precio Sugerido:"
+                f" **${precio_sug:,.2f}**"
+            )
+
+            descripcion = producto_elegido
+            cantidad_vendida = st.sidebar.number_input(
+                "Cantidad a Vender",
+                min_value=1,
+                max_value=max(1, stock_disp),
+                value=1,
+                step=1,
+            )
+            total_venta = st.sidebar.number_input(
+                "Total Venta ($)",
+                min_value=0.0,
+                value=float(precio_sug * cantidad_vendida),
+                step=1000.0,
+            )
+
+        abono = st.sidebar.number_input(
+            "Abono Realizado por la Clienta ($)",
+            min_value=0.0,
+            value=float(total_venta),
+            step=1000.0,
+        )
+
+        credito_pendiente = max(0.0, total_venta - abono)
+        st.sidebar.info(f"📉 Crédito Pendiente: ${credito_pendiente:,.2f}")
+
+        if credito_pendiente == 0:
+            estado = "Pagado Completo 🟢"
+        elif abono > 0:
+            estado = "Abono / Parcial 🟡"
+        else:
+            estado = "Crédito Pendiente 🔴"
+    else:
+        descripcion = st.sidebar.text_area(
+            "Texto de la Promoción",
+            value=(
+                "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
+                " accesorios disponibles. ¿Te gustaría ver el catálogo?"
+            ),
+        )
+        cantidad_vendida = 0
+        total_venta = 0.0
+        abono = 0.0
+        credito_pendiente = 0.0
+        estado = "Promoción 📢"
+
+    if st.sidebar.button("Guardar Venta y Descontar Stock"):
+        if not cliente or not telefono:
+            st.sidebar.error(
+                "⚠️ Por favor, asegúrate de ingresar el nombre y el teléfono."
+            )
+        else:
+            nueva_venta = pd.DataFrame(
+                [[
+                    fecha_venta,
+                    cliente,
+                    telefono,
+                    tipo_movimiento,
+                    descripcion,
+                    cantidad_vendida,
+                    total_venta,
+                    abono,
+                    credito_pendiente,
+                    estado,
+                ]],
+                columns=COLUMNAS_VENTAS,
+            )
+            st.session_state.ventas = pd.concat(
+                [st.session_state.ventas, nueva_venta], ignore_index=True
+            )
+            st.session_state.ventas = st.session_state.ventas.sort_values(
+                by="Fecha", ascending=False
+            )
+
+            # Descontar stock automáticamente del inventario
+            if tipo_movimiento == "Venta / Aviso de Pago" and cantidad_vendida > 0:
+                if (
+                    not st.session_state.inventario.empty
+                    and descripcion
+                    in st.session_state.inventario["Producto"].values
+                ):
+                    idx_p = st.session_state.inventario.index[
+                        st.session_state.inventario["Producto"] == descripcion
+                    ][0]
+                    st.session_state.inventario.loc[idx_p, "Stock Actual"] = max(
+                        0,
+                        st.session_state.inventario.loc[idx_p, "Stock Actual"]
+                        - cantidad_vendida,
+                    )
+
+            if (
+                st.session_state.clientas.empty
+                or cliente not in st.session_state.clientas["Cliente"].values
+            ):
+                nueva_cli = pd.DataFrame(
+                    [[cliente, telefono]],
+                    columns=st.session_state.clientas.columns,
+                )
+                st.session_state.clientas = pd.concat(
+                    [st.session_state.clientas, nueva_cli], ignore_index=True
+                )
+
+            st.sidebar.success("¡Venta registrada y stock descontado con éxito!")
+
+# --- PANEL PRINCIPAL: RESUMEN Y PESTAÑAS ---
+df_compras = st.session_state.compras
+df_ventas = st.session_state.ventas
+df_clientas = st.session_state.clientas
+df_inventario = st.session_state.inventario
+
+total_invertido_compras = (
+    df_compras["Inversión Total ($)"].sum() if not df_compras.empty else 0.0
+)
+
+if not df_ventas.empty and "Total Venta ($)" in df_ventas.columns:
+    df_solo_ventas = df_ventas[df_ventas["Tipo"] == "Venta / Aviso de Pago"]
+    total_ingresos_ventas = (
+        df_solo_ventas["Total Venta ($)"].sum()
+        if not df_solo_ventas.empty
+        else 0.0
+    )
+    total_abonos_recibidos = (
+        df_solo_ventas["Abono ($)"].sum() if not df_solo_ventas.empty else 0.0
+    )
+    total_creditos_pendientes = (
+        df_solo_ventas["Crédito Pendiente ($)"].sum()
+        if not df_solo_ventas.empty
+        else 0.0
+    )
+else:
+    total_ingresos_ventas = 0.0
+    total_abonos_recibidos = 0.0
+    total_creditos_pendientes = 0.0
+
+# Fórmula de Utilidad: Ventas Totales menos Abonos
+utilidad_obtenida = total_ingresos_ventas - total_abonos_recibidos
+
+# Tarjetas de Resumen Financiero Global (5 tarjetas)
+col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+col_m1.metric("📦 Inversión Compras", f"${total_invertido_compras:,.2f}")
+col_m2.metric("💰 Ventas Totales", f"${total_ingresos_ventas:,.2f}")
+col_m3.metric("📥 Abonos Recibidos", f"${total_abonos_recibidos:,.2f}")
+col_m4.metric("⚠️ Crédito Pendiente", f"${total_creditos_pendientes:,.2f}")
+col_m5.metric("📈 Utilidad Obtenida", f"${utilidad_obtenida:,.2f}")
+
+st.markdown("---")
+
+# Pestañas principales organizadas para mostrar TODO el detalle
+tab1, tab2, tab3, tab4 = st.tabs([
+    "💬 Historial de Ventas y WhatsApp",
+    "📦 Control de Inventario (Stock)",
+    "👥 Directorio de Clientas",
+    "📦 Registro de Compras Detallado",
+])
+
+with tab1:
+    if not df_ventas.empty:
+        st.subheader("📋 Ventas, Abonos y Créditos Ordenados por Fecha")
+
+        for index, row in df_ventas.iterrows():
+            with st.container():
+                c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
+
+                c1.markdown(f"**📅 {row['Fecha']}**")
+                c1.markdown(f"**👤 {row['Cliente']}**")
+                c1.caption(f"📱 Tel: `{row['Teléfono']}`")
+
+                c2.markdown(f"**Estado:** {row['Estado']}")
+
+                if row["Tipo"] == "Venta / Aviso de Pago":
+                    c3.markdown(
+                        f"**Prod:** {row['Descripción']} (Cant:"
+                        f" {row.get('Cantidad', 1)}) <br> **Total:**"
+                        f" ${row['Total Venta ($)']:,.2f} <br> **Abono:**"
+                        f" ${row['Abono ($)']:,.2f} <br> **Pendiente:**"
+                        f" 🔴 ${row['Crédito Pendiente ($)']:,.2f}",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    c3.markdown(f"**Promoción:** {row['Descripción']}")
+
+                if "Pagado Completo" in str(row["Estado"]):
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para confirmarte que hemos recibido tu pago total por"
+                        f" ${row['Total Venta ($)']:,.2f} correspondiente a:"
+                        f" *{row['Descripción']}*. ¡Muchas gracias por tu"
+                        " compra!"
+                    )
+                elif "Abono" in str(row["Estado"]):
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para confirmarte tu abono de ${row['Abono ($)']:,.2f}."
+                        f" El total de tu compra es ${row['Total Venta ($)']:,.2f}"
+                        f" y te queda un saldo pendiente de"
+                        f" ${row['Crédito Pendiente ($)']:,.2f} por:"
+                        f" *{row['Descripción']}*. ¡Gracias!"
+                    )
+                elif "Promoción" in str(row["Estado"]):
+                    texto_msj = row["Descripción"]
+                else:
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para recordarte que tienes un saldo pendiente de"
+                        f" ${row['Crédito Pendiente ($)']:,.2f} por tu compra"
+                        f" de: *{row['Descripción']}*."
+                    )
+
+                mensaje_codificado = urllib.parse.quote(texto_msj)
+                link_wsp = (
+                    f"https://wa.me/{row['Teléfono']}?text={mensaje_codificado}"
+                )
+
+                c4.markdown(
+                    f"[💬 Enviar a WhatsApp]({link_wsp})", unsafe_allow_html=True
+                )
+                st.markdown("---")
+
+        if st.button("🗑️ Borrar Historial de Ventas"):
+            st.session_state.ventas = pd.DataFrame(columns=COLUMNAS_VENTAS)
+            st.rerun()
+    else:
+        st.info("Aún no hay registros de ventas o mensajes.")
+
+with tab2:
+    st.subheader("📦 Estado Actual del Inventario")
+    if not df_inventario.empty:
+        st.dataframe(df_inventario, use_container_width=True)
+        st.success(
+            f"Tienes **{len(df_inventario)} productos** diferentes registrados en"
+            " stock."
+        )
+
+        if st.button("🗑️ Borrar Inventario Completo"):
+            st.session_state.inventario = pd.DataFrame(
+                columns=COLUMNAS_INVENTARIO
+            )
+            st.rerun()
+    else:
+        st.info(
+            "Aún no hay productos en el inventario. Se llenará automáticamente"
+            " al registrar tus compras o entradas de mercancía."
+        )
+
+with tab3:
+    st.subheader("👥 Base de Datos de Clientas")
+    if not df_clientas.empty:
+        st.dataframe(df_clientas, use_container_width=True)
+        st.success(f"Tienes un total de **{len(df_clientas)} clientas** guardadas.")
+
+        if st.button("🗑️ Borrar Directorio de Clientas"):
+            st.session_state.clientas = pd.DataFrame(columns=["Cliente", "Teléfono"])
+            st.rerun()
+    else:
+        st.info(
+            "Aún no hay clientas registradas. Se guardarán automáticamente aquí"
+            " cuando registres ventas o usando el menú lateral."
+        )
+
+with tab4:
+    st.subheader("📋 Detalle de Compras y Proveedores")
+    if not df_compras.empty:
+        st.dataframe(df_compras, use_container_width=True)
+        st.success(f"Tienes un total de **{len(df_compras)} registros** de compras.")
+
+        if st.button("🗑️ Borrar Historial de Compras"):
+            st.session_state.compras = pd.DataFrame(columns=COLUMNAS_COMPRAS)
+            st.rerun()
+    else:
+        st.info(
+            "Aún no hay compras registradas. Usa el menú izquierdo en"
+            " 'Registrar Compra / Inversión Global'."
+        )
