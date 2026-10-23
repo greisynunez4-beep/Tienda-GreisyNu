@@ -11,195 +11,224 @@ st.set_page_config(
 
 st.title("👜 GreisyNu Store: Control Financiero y WhatsApp")
 st.write(
-    "Lleva el control de tus ventas, costos, ganancias y notifica a tus"
+    "Lleva el control de tus compras globales, tus ventas y notifica a tus"
     " clientas al instante."
 )
 
-# Definir las columnas oficiales y completas de la tienda
-COLUMNAS_OFICIALES = [
-    "Fecha",
-    "Cliente",
-    "Teléfono",
-    "Tipo",
-    "Descripción",
-    "Cantidad",
-    "Costo Unitario ($)",
-    "Precio Venta ($)",
-    "Ingreso Total ($)",
-    "Costo Total ($)",
-    "Ganancia Neta ($)",
-    "Margen (%)",
-    "Estado",
-]
+# Inicializar bases de datos separadas para Compras y Ventas/Mensajes en la sesión
+if "compras" not in st.session_state:
+    st.session_state.compras = pd.DataFrame(
+        columns=["Fecha", "Proveedor / Detalle", "Inversión Total ($)"]
+    )
 
-# Inicializar o corregir la base de datos si las columnas no coinciden
-if (
-    "data" not in st.session_state
-    or list(st.session_state.data.columns) != COLUMNAS_OFICIALES
-):
-    st.session_state.data = pd.DataFrame(columns=COLUMNAS_OFICIALES)
+if "ventas" not in st.session_state:
+    st.session_state.ventas = pd.DataFrame(
+        columns=[
+            "Fecha",
+            "Cliente",
+            "Teléfono",
+            "Tipo",
+            "Descripción",
+            "Precio Venta ($)",
+            "Estado",
+        ]
+    )
 
-# --- MENÚ LATERAL: REGISTRAR MOVIMIENTO ---
-st.sidebar.header("📝 Registrar Transacción")
+# --- MENÚ LATERAL: REGISTRAR COMPRAS O VENTAS ---
+st.sidebar.header("📝 Menú de Registro")
 
-cliente = st.sidebar.text_input("Nombre de la Clienta", placeholder="Ej. Ana Gómez")
-telefono = st.sidebar.text_input(
-    "Teléfono (con código de país)", placeholder="573001234567"
+menu_opcion = st.sidebar.selectbox(
+    "¿Qué deseas registrar?",
+    ["Registrar Compra / Inversión Global", "Registrar Venta o Promoción"],
 )
-tipo_movimiento = st.sidebar.selectbox(
-    "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
-)
-fecha = st.sidebar.date_input("Fecha")
-cantidad = st.sidebar.number_input("Cantidad", min_value=1, value=1, step=1)
 
-if tipo_movimiento == "Venta / Aviso de Pago":
-    descripcion = st.sidebar.text_input(
-        "Detalle del Producto", placeholder="Ej. Bolso Crossbody Negro"
+if menu_opcion == "Registrar Compra / Inversión Global":
+    st.sidebar.subheader("📦 Inversión en Mercancía")
+    fecha_compra = st.sidebar.date_input("Fecha de Compra")
+    detalle_compra = st.sidebar.text_input(
+        "Proveedor o Detalle",
+        placeholder="Ej. Surtido de bolsos y accesorios mayorista",
     )
-    costo_unitario = st.sidebar.number_input(
-        "Costo de Compra (Mayorista) c/u ($)",
+    total_inversion = st.sidebar.number_input(
+        "Costo Total de la Compra ($)",
         min_value=0.0,
-        value=0.0,
-        step=1000.0,
+        value=200000.0,
+        step=10000.0,
     )
-    precio_unitario = st.sidebar.number_input(
-        "Precio de Venta al Público c/u ($)",
-        min_value=0.0,
-        value=50000.0,
-        step=1000.0,
-    )
-    estado = st.sidebar.selectbox(
-        "Estado del Pago", ["Pago Recibido 🟢", "Pendiente de Pago 🟡"]
-    )
+
+    if st.sidebar.button("Guardar Compra"):
+        if not detalle_compra:
+            st.sidebar.error("⚠️ Por favor, ingresa un detalle o proveedor.")
+        else:
+            nueva_compra = pd.DataFrame(
+                [[fecha_compra, detalle_compra, total_inversion]],
+                columns=st.session_state.compras.columns,
+            )
+            st.session_state.compras = pd.concat(
+                [st.session_state.compras, nueva_compra], ignore_index=True
+            )
+            st.sidebar.success("¡Inversión en mercancía guardada con éxito!")
+
 else:
-    descripcion = st.sidebar.text_area(
-        "Texto de la Promoción",
-        value=(
-            "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
-            " accesorios disponibles. ¿Te gustaría ver el catálogo?"
-        ),
+    st.sidebar.subheader("🛍️ Venta o Mensaje a Clienta")
+    cliente = st.sidebar.text_input(
+        "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
     )
-    costo_unitario = 0.0
-    precio_unitario = 0.0
-    estado = "Promoción 📢"
+    telefono = st.sidebar.text_input(
+        "Teléfono (con código de país)", placeholder="573001234567"
+    )
+    tipo_movimiento = st.sidebar.selectbox(
+        "Acción", ["Venta / Aviso de Pago", "Promoción de Temporada"]
+    )
+    fecha_venta = st.sidebar.date_input("Fecha")
 
-if st.sidebar.button("Guardar y Generar WhatsApp"):
-    if not cliente or not telefono:
-        st.sidebar.error(
-            "⚠️ Por favor, ingresa el nombre y el teléfono de la clienta."
+    if tipo_movimiento == "Venta / Aviso de Pago":
+        descripcion = st.sidebar.text_input(
+            "Detalle del Producto", placeholder="Ej. Bolso Crossbody Negro"
+        )
+        precio_venta = st.sidebar.number_input(
+            "Precio de Venta Total ($)",
+            min_value=0.0,
+            value=50000.0,
+            step=1000.0,
+        )
+        estado = st.sidebar.selectbox(
+            "Estado del Pago", ["Pago Recibido 🟢", "Pendiente de Pago 🟡"]
         )
     else:
-        if tipo_movimiento == "Venta / Aviso de Pago":
-            ingreso_total = cantidad * precio_unitario
-            costo_total = cantidad * costo_unitario
-            ganancia_neta = ingreso_total - costo_total
-            margen = (
-                (ganancia_neta / ingreso_total * 100)
-                if ingreso_total > 0
-                else 0
+        descripcion = st.sidebar.text_area(
+            "Texto de la Promoción",
+            value=(
+                "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
+                " accesorios disponibles. ¿Te gustaría ver el catálogo?"
+            ),
+        )
+        precio_venta = 0.0
+        estado = "Promoción 📢"
+
+    if st.sidebar.button("Guardar Venta y Generar WhatsApp"):
+        if not cliente or not telefono:
+            st.sidebar.error(
+                "⚠️ Por favor, ingresa el nombre y el teléfono de la clienta."
             )
         else:
-            ingreso_total = 0.0
-            costo_total = 0.0
-            ganancia_neta = 0.0
-            margen = 0.0
+            nueva_venta = pd.DataFrame(
+                [[
+                    fecha_venta,
+                    cliente,
+                    telefono,
+                    tipo_movimiento,
+                    descripcion,
+                    precio_venta,
+                    estado,
+                ]],
+                columns=st.session_state.ventas.columns,
+            )
+            st.session_state.ventas = pd.concat(
+                [st.session_state.ventas, nueva_venta], ignore_index=True
+            )
+            st.sidebar.success("¡Venta registrada con éxito!")
 
-        nuevo_registro = pd.DataFrame(
-            [[
-                fecha,
-                cliente,
-                telefono,
-                tipo_movimiento,
-                descripcion,
-                cantidad,
-                costo_unitario,
-                precio_unitario,
-                ingreso_total,
-                costo_total,
-                ganancia_neta,
-                margen,
-                estado,
-            ]],
-            columns=COLUMNAS_OFICIALES,
-        )
-        st.session_state.data = pd.concat(
-            [st.session_state.data, nuevo_registro], ignore_index=True
-        )
-        st.sidebar.success("¡Registrado con éxito!")
+# --- PANEL PRINCIPAL: RESUMEN Y WHATSAPP ---
+df_compras = st.session_state.compras
+df_ventas = st.session_state.ventas
 
-# --- PANEL PRINCIPAL: RESUMEN FINANCIERO Y WHATSAPP ---
-df = st.session_state.data
+# Calcular totales generales
+total_invertido_compras = (
+    df_compras["Inversión Total ($)"].sum() if not df_compras.empty else 0.0
+)
+df_solo_ventas = (
+    df_ventas[df_ventas["Tipo"] == "Venta / Aviso de Pago"]
+    if not df_ventas.empty
+    else pd.DataFrame()
+)
+total_ingresos_ventas = (
+    df_solo_ventas["Precio Venta ($)"].sum()
+    if not df_solo_ventas.empty
+    else 0.0
+)
+balance_general = total_ingresos_ventas - total_invertido_compras
 
-if not df.empty:
-    # Filtrar métricas de ventas reales
-    df_ventas = df[df["Tipo"] == "Venta / Aviso de Pago"]
+# Tarjetas de Resumen Financiero Global
+col_m1, col_m2, col_m3 = st.columns(3)
+col_m1.metric("📦 Total Invertido en Compras", f"${total_invertido_compras:,.2f}")
+col_m2.metric("💰 Ventas Totales", f"${total_ingresos_ventas:,.2f}")
+col_m3.metric(
+    "📊 Balance Global (Ventas - Inversión)", f"${balance_general:,.2f}"
+)
 
+st.markdown("---")
+
+# Pestañas para organizar la visualización
+tab1, tab2 = st.tabs(["💬 Historial de Ventas y WhatsApp", "📦 Registro de Compras Globales"])
+
+with tab1:
     if not df_ventas.empty:
-        total_ingresos = df_ventas["Ingreso Total ($)"].sum()
-        total_costos = df_ventas["Costo Total ($)"].sum()
-        ganancia_total = df_ventas["Ganancia Neta ($)"].sum()
+        st.subheader("📋 Clientas y Envíos rápidos por WhatsApp")
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Ventas Totales", f"${total_ingresos:,.2f}")
-        col2.metric("📦 Costo de Mercancía", f"${total_costos:,.2f}")
-        col3.metric("📈 Ganancia Neta Real", f"${ganancia_total:,.2f}")
+        for index, row in df_ventas.iterrows():
+            with st.container():
+                c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
 
-        st.markdown("---")
+                c1.markdown(f"**👤 {row['Cliente']}**")
+                c1.caption(f"📱 Tel: `{row['Teléfono']}`")
 
-    st.subheader("📋 Historial de Clientas y Envíos por WhatsApp")
+                c2.markdown(f"**Estado:** {row['Estado']}")
 
-    for index, row in df.iterrows():
-        with st.container():
-            col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+                if row["Tipo"] == "Venta / Aviso de Pago":
+                    c3.markdown(
+                        f"**Prod:** {row['Descripción']} <br> **Valor:**"
+                        f" ${row['Precio Venta ($)']:,.2f}",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    c3.markdown(f"**Promoción:** {row['Descripción']}")
 
-            col1.markdown(f"**👤 {row['Cliente']}**")
-            col1.caption(f"📱 Tel: `{row['Teléfono']}`")
+                # Construir mensaje personalizado para WhatsApp
+                if "Pago Recibido" in str(row["Estado"]):
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para confirmarte que hemos recibido tu pago por"
+                        f" ${row['Precio Venta ($)']:,.2f} correspondiente a:"
+                        f" *{row['Descripción']}*. ¡Muchas gracias por tu"
+                        " compra!"
+                    )
+                elif "Promoción" in str(row["Estado"]):
+                    texto_msj = row["Descripción"]
+                else:
+                    texto_msj = (
+                        f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store"
+                        f" para recordarte que tienes un saldo pendiente de"
+                        f" ${row['Precio Venta ($)']:,.2f} por:"
+                        f" *{row['Descripción']}*."
+                    )
 
-            col2.markdown(f"**Estado:** {row['Estado']}")
-
-            if row["Tipo"] == "Venta / Aviso de Pago":
-                col3.markdown(
-                    f"**Prod:** {row['Descripción']} <br> **Venta:**"
-                    f" ${row['Ingreso Total ($)']:,.2f} <br> **Ganancia:**"
-                    f" 🟢 ${row['Ganancia Neta ($)']:,.2f}",
-                    unsafe_allow_html=True,
-                )
-            else:
-                col3.markdown(f"**Promoción:** {row['Descripción']}")
-
-            # Construir mensaje personalizado para WhatsApp
-            if "Pago Recibido" in str(row["Estado"]):
-                texto_msj = (
-                    f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store para"
-                    " confirmarte que hemos recibido tu pago por"
-                    f" ${row['Ingreso Total ($)']:,.2f} correspondiente a:"
-                    f" *{row['Descripción']}*. ¡Muchas gracias por tu compra!"
-                )
-            elif "Promoción" in str(row["Estado"]):
-                texto_msj = row["Descripción"]
-            else:
-                texto_msj = (
-                    f"¡Hola {row['Cliente']}! 👜 Te escribo de GreisyNu Store para"
-                    f" recordarte que tienes un saldo pendiente de"
-                    f" ${row['Ingreso Total ($)']:,.2f} por:"
-                    f" *{row['Descripción']}*."
+                mensaje_codificado = urllib.parse.quote(texto_msj)
+                link_wsp = (
+                    f"https://wa.me/{row['Teléfono']}?text={mensaje_codificado}"
                 )
 
-            mensaje_codificado = urllib.parse.quote(texto_msj)
-            link_wsp = (
-                f"https://wa.me/{row['Teléfono']}?text={mensaje_codificado}"
-            )
+                c4.markdown(
+                    f"[💬 Enviar a WhatsApp]({link_wsp})", unsafe_allow_html=True
+                )
+                st.markdown("---")
 
-            col4.markdown(
-                f"[💬 Enviar a WhatsApp]({link_wsp})", unsafe_allow_html=True
-            )
-            st.markdown("---")
+        if st.button("🗑️ Borrar Historial de Ventas"):
+            st.session_state.ventas = pd.DataFrame(columns=df_ventas.columns)
+            st.rerun()
+    else:
+        st.info("Aún no hay registros de ventas o mensajes.")
 
-    if st.button("🗑️ Borrar Todo el Historial"):
-        st.session_state.data = pd.DataFrame(columns=COLUMNAS_OFICIALES)
-        st.rerun()
-else:
-    st.info(
-        "Aún no hay registros. Llena los datos en el panel izquierdo para"
-        " empezar a ver tus cuentas y generar mensajes."
-    )
+with tab2:
+    if not df_compras.empty:
+        st.subheader("📋 Historial de Inversiones en Compras Mayoristas")
+        st.dataframe(df_compras, use_container_width=True)
+
+        if st.button("🗑️ Borrar Historial de Compras"):
+            st.session_state.compras = pd.DataFrame(columns=df_compras.columns)
+            st.rerun()
+    else:
+        st.info(
+            "Aún no hay compras registradas. Usa el menú izquierdo para"
+            " registrar tus inversiones globales."
+        )
