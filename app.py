@@ -124,7 +124,6 @@ elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
     if st.session_state.ventas.empty:
         st.sidebar.warning("No hay ventas registradas para editar.")
     else:
-        # Crear opciones legibles para identificar la venta a editar
         opciones_ventas = []
         for idx, row in st.session_state.ventas.iterrows():
             opciones_ventas.append(
@@ -136,7 +135,6 @@ elif menu_opcion == "✏️ Editar Venta o Abonar Saldo":
         )
         idx_edit = int(venta_seleccionada_str.split(":")[0])
 
-        # Obtener valores actuales
         reg_actual = st.session_state.ventas.loc[idx_edit]
 
         nuevo_total = st.sidebar.number_input(
@@ -183,88 +181,4 @@ else:  # Registrar Venta o Promoción
     )
     fecha_venta = st.sidebar.date_input("Fecha")
 
-    # Selección de clienta guardada
-    if not st.session_state.clientas.empty:
-        lista_nombres = list(st.session_state.clientas["Cliente"].unique())
-        lista_nombres.insert(0, "-- Escribir nueva o seleccionar --")
-        cliente_seleccionada = st.sidebar.selectbox(
-            "Seleccionar Clienta Guardada", lista_nombres
-        )
-
-        if cliente_seleccionada != "-- Escribir nueva o seleccionar --":
-            cliente = cliente_seleccionada
-            telefono = str(
-                st.session_state.clientas.loc[
-                    st.session_state.clientas["Cliente"] == cliente, "Teléfono"
-                ].values[0]
-            )
-            st.sidebar.info(f"📱 Teléfono cargado: `{telefono}`")
-        else:
-            cliente = st.sidebar.text_input(
-                "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
-            )
-            telefono = st.sidebar.text_input(
-                "Teléfono", placeholder="573001234567"
-            )
-    else:
-        st.sidebar.warning(
-            "💡 No tienes clientas guardadas aún. Puedes agregarlas en la"
-            " opción 'Crear / Registrar Nueva Clienta'."
-        )
-        cliente = st.sidebar.text_input(
-            "Nombre de la Clienta", placeholder="Ej. Ana Gómez"
-        )
-        telefono = st.sidebar.text_input("Teléfono", placeholder="573001234567")
-
-    if tipo_movimiento == "Venta / Aviso de Pago":
-        descripcion = st.sidebar.text_input(
-            "Detalle del Producto", placeholder="Ej. Bolso Crossbody Negro"
-        )
-        total_venta = st.sidebar.number_input(
-            "Total Venta ($)", min_value=0.0, value=50000.0, step=1000.0
-        )
-        abono = st.sidebar.number_input(
-            "Abono Realizado ($)", min_value=0.0, value=50000.0, step=1000.0
-        )
-
-        credito_pendiente = max(0.0, total_venta - abono)
-        st.sidebar.info(f"📉 Crédito Pendiente: ${credito_pendiente:,.2f}")
-
-        if credito_pendiente == 0:
-            estado = "Pagado Completo 🟢"
-        elif abono > 0:
-            estado = "Abono / Parcial 🟡"
-        else:
-            estado = "Crédito Pendiente 🔴"
-    else:
-        descripcion = st.sidebar.text_area(
-            "Texto de la Promoción",
-            value=(
-                "¡Hola! 👋 Te escribo de GreisyNu Store. Tenemos nuevos bolsos y"
-                " accesorios disponibles. ¿Te gustaría ver el catálogo?"
-            ),
-        )
-        total_venta = 0.0
-        abono = 0.0
-        credito_pendiente = 0.0
-        estado = "Promoción 📢"
-
-    if st.sidebar.button("Guardar Venta y Generar WhatsApp"):
-        if not cliente or not telefono:
-            st.sidebar.error(
-                "⚠️ Por favor, asegúrate de ingresar el nombre y el teléfono."
-            )
-        else:
-            nueva_venta = pd.DataFrame(
-                [[
-                    fecha_venta,
-                    cliente,
-                    telefono,
-                    tipo_movimiento,
-                    descripcion,
-                    total_venta,
-                    abono,
-                    credito_pendiente,
-                    estado,
-                ]],
-                columns=COLUMNAS_VENTAS,
+    if not
