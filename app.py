@@ -15,19 +15,23 @@ st.write(
     " clientas al instante."
 )
 
-# Inicializar base de datos
-if "data" not in st.session_state:
-    st.session_state.data = pd.DataFrame(
-        columns=[
-            "Fecha",
-            "Cliente",
-            "Teléfono",
-            "Tipo",
-            "Descripción",
-            "Total ($)",
-            "Estado",
-        ]
-    )
+# Definir las columnas oficiales y obligatorias
+COLUMNAS_OFICIALES = [
+    "Fecha",
+    "Cliente",
+    "Teléfono",
+    "Tipo",
+    "Descripción",
+    "Total ($)",
+    "Estado",
+]
+
+# Inicializar o corregir la base de datos si las columnas no coinciden
+if (
+    "data" not in st.session_state
+    or list(st.session_state.data.columns) != COLUMNAS_OFICIALES
+):
+    st.session_state.data = pd.DataFrame(columns=COLUMNAS_OFICIALES)
 
 # --- MENÚ LATERAL: REGISTRAR VENTA O PAGO ---
 st.sidebar.header("📝 Registrar Venta o Pago")
@@ -70,7 +74,7 @@ if st.sidebar.button("Generar Registro y Mensaje de WhatsApp"):
     else:
         nuevo_registro = pd.DataFrame(
             [[fecha, cliente, telefono, tipo_movimiento, descripcion, monto, estado]],
-            columns=st.session_state.data.columns,
+            columns=COLUMNAS_OFICIALES,
         )
         st.session_state.data = pd.concat(
             [st.session_state.data, nuevo_registro], ignore_index=True
@@ -129,7 +133,7 @@ if not df.empty:
             st.markdown("---")
 
     if st.button("🗑️ Borrar Todo el Historial"):
-        st.session_state.data = pd.DataFrame(columns=df.columns)
+        st.session_state.data = pd.DataFrame(columns=COLUMNAS_OFICIALES)
         st.rerun()
 else:
     st.info(
